@@ -4,7 +4,7 @@ function Profile() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const handleLogin = () => {
-    // This is a placeholder function. You can expand this in the future.
+    // This is a placeholder function
     setIsLoggedIn(true);
   };
 
@@ -32,7 +32,7 @@ function Profile() {
           <button
             type="button"
             onClick={handleLogin}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
           >
             Login
           </button>
