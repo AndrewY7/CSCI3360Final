@@ -42,9 +42,32 @@ function Profile() {
   }
 
   return (
-    <div className="flex flex-col items-center mt-10">
-      <h2 className="text-2xl font-bold">Welcome to Your Profile!</h2>
-      <p className="mt-4 text-gray-700">This is your profile page. Here you can view and edit your personal information.</p>
+    <div className="container mx-auto p-8">
+      <h1 className="text-4xl font-bold mb-6">My Profile</h1>
+
+      {/* Main content */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold mb-2">My Goals</h2>
+          <p className="text-gray-600">Details about personal goals.</p>
+        </div>
+        
+        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold mb-2">Workout Plan</h2>
+          <p className="text-gray-600">Details about the workout plan.</p>
+        </div>
+
+        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold mb-2">Diet Plan</h2>
+          <p className="text-gray-600">Details about the diet plan.</p>
+        </div>
+
+        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold mb-2">Google Calendar API</h2>
+          <p className="text-gray-600">Integration with Google Calendar.</p>
+        </div>
+      </div>
+
     </div>
   );
 }
