@@ -1,17 +1,72 @@
 import React, { useState, useRef, useEffect } from 'react';
 
+const INITIAL_MESSAGE = `Hi! I'm your personal health assistant. To help you better, I'd like to know a few things about you:
+1. Your age
+2. Your sex (male/female)
+3. Your height (in cm)
+4. Your weight (in kg)
+5. Your physical activity level (sedentary/light/moderate/heavy/athlete)
+6. Your health goals
+
+Please provide these details so I can give you personalized advice.`;
+
 function HealthAssistant() {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: INITIAL_MESSAGE }
+  ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
   const chatContainerRef = useRef(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const processUserProfile = (message) => {
+    // Simple regex patterns for profile information
+    const patterns = {
+      age: /\b\d{1,2}\b/,
+      sex: /\b(male|female)\b/i,
+      height: /\b\d{2,3}\b(?=\s*cm)/,
+      weight: /\b\d{2,3}\b(?=\s*kg)/,
+      activity: /\b(sedentary|light|moderate|heavy|athlete)\b/i,
+    };
+
+    const profile = {};
+    for (const [key, pattern] of Object.entries(patterns)) {
+      const match = message.toLowerCase().match(pattern);
+      if (match) {
+        profile[key] = match[0];
+      }
+    }
+
+    return Object.keys(profile).length >= 5 ? profile : null;
+  };
+
+  const callOpenAI = async (messageHistory) => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: messageHistory }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from OpenAI');
+      }
+
+      const data = await response.json();
+      return data.message;
+    } catch (error) {
+      console.error('Error calling OpenAI:', error);
+      throw error;
+    }
+  };
 
   const handleSend = async () => {
     if (!inputMessage.trim()) return;
@@ -26,25 +81,57 @@ function HealthAssistant() {
     setIsLoading(true);
 
     try {
-      // Placeholder for API call
-      // Replace with actual OpenAI API integration
-      const response = "This is a placeholder response. OpenAI integration coming soon!";
+      // Check for profile information if not already set
+      if (!userProfile) {
+        const profile = processUserProfile(inputMessage);
+        if (profile) {
+          setUserProfile(profile);
+          const profileConfirmation = {
+            role: 'system',
+            content: `User profile set: Age: ${profile.age}, Sex: ${profile.sex}, Height: ${profile.height}cm, Weight: ${profile.weight}kg, Activity Level: ${profile.activity}`
+          };
+          setMessages(prev => [...prev, profileConfirmation]);
+        }
+      }
+
+      // Prepare messages for API call
+      const messageHistory = [
+        {
+          role: 'system',
+          content: `You are a helpful health assistant. ${
+            userProfile ? 
+            `User profile: Age: ${userProfile.age}, Sex: ${userProfile.sex}, Height: ${userProfile.height}cm, Weight: ${userProfile.weight}kg, Activity: ${userProfile.activity}` 
+            : 'Still collecting user profile information.'
+          }
+          
+          Key responsibilities:
+          1. If user profile is not set, focus on collecting missing profile information
+          2. Once profile is set, provide personalized health advice
+          3. Use Mifflin-St Jeor Formula for caloric calculations when relevant
+          4. Focus on evidence-based recommendations
+          5. Be encouraging and supportive
+          6. For mental health questions, provide general guidance and recommend professional help when appropriate
+          
+          Always maintain a professional yet friendly tone.`
+        },
+        ...messages,
+        newMessage
+      ];
+
+      const response = await callOpenAI(messageHistory);
       
-      setTimeout(() => {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: response 
-        }]);
-        setIsLoading(false);
-      }, 1000);
-      
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: response 
+      }]);
     } catch (error) {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: "I apologize, but I encountered an error. Please try again."
       }]);
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   };
 
   const renderMessage = (content) => {
