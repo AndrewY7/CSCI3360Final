@@ -25,30 +25,9 @@ function HealthAssistant() {
     }
   }, [messages]);
 
-  const processUserProfile = (message) => {
-    // Simple regex patterns for profile information
-    const patterns = {
-      age: /\b\d{1,2}\b/,
-      sex: /\b(male|female)\b/i,
-      height: /\b\d{2,3}\b(?=\s*cm)/,
-      weight: /\b\d{2,3}\b(?=\s*kg)/,
-      activity: /\b(sedentary|light|moderate|heavy|athlete)\b/i,
-    };
-
-    const profile = {};
-    for (const [key, pattern] of Object.entries(patterns)) {
-      const match = message.toLowerCase().match(pattern);
-      if (match) {
-        profile[key] = match[0];
-      }
-    }
-
-    return Object.keys(profile).length >= 5 ? profile : null;
-  };
-
   const callOpenAI = async (messageHistory) => {
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('http://localhost:3001/api/chat', {  // Update this URL to match your backend port
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,19 +60,6 @@ function HealthAssistant() {
     setIsLoading(true);
 
     try {
-      // Check for profile information if not already set
-      if (!userProfile) {
-        const profile = processUserProfile(inputMessage);
-        if (profile) {
-          setUserProfile(profile);
-          const profileConfirmation = {
-            role: 'system',
-            content: `User profile set: Age: ${profile.age}, Sex: ${profile.sex}, Height: ${profile.height}cm, Weight: ${profile.weight}kg, Activity Level: ${profile.activity}`
-          };
-          setMessages(prev => [...prev, profileConfirmation]);
-        }
-      }
-
       // Prepare messages for API call
       const messageHistory = [
         {
