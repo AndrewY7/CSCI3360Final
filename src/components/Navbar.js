@@ -12,16 +12,6 @@ function Navbar() {
       
       <div className="flex items-center space-x-6">
         <Link 
-          to="/home" 
-          className={`${
-            location.pathname === '/home' 
-              ? 'text-red-500' 
-              : 'text-gray-700 hover:text-red-500'
-          }`}
-        >
-          Home
-        </Link>
-        <Link 
           to="/about" 
           className={`${
             location.pathname === '/about' 
