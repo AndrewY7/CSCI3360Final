@@ -1,5 +1,4 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-firebase.js
 # dependencies
 /node_modules
 /.pnp
@@ -21,3 +20,8 @@ firebase.js
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
