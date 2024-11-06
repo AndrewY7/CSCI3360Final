@@ -1,23 +1,44 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 function Navbar() {
+  const location = useLocation();
+
   return (
     <nav className="bg-white shadow-md py-4 px-8 flex items-center">
-      {/* Logo on the left */}
       <div className="text-2xl font-bold text-red-500 mr-auto">
         Healthai
       </div>
       
-      {/* Navigation items and profile button grouped together */}
       <div className="flex items-center space-x-6">
-        <Link to="/about" className="text-gray-700 hover:text-black">
+        <Link 
+          to="/about" 
+          className={`${
+            location.pathname === '/about' 
+              ? 'text-red-500' 
+              : 'text-gray-700 hover:text-red-500'
+          }`}
+        >
           About
         </Link>
-        <Link to="/healthassistant" className="text-gray-700 hover:text-black">
+        <Link 
+          to="/healthassistant" 
+          className={`${
+            location.pathname === '/healthassistant' 
+              ? 'text-red-500' 
+              : 'text-gray-700 hover:text-red-500'
+          }`}
+        >
           Health Assistant
         </Link>
-        <Link to="/profile" className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600">
+        <Link 
+          to="/profile" 
+          className={`${
+            location.pathname === '/profile'
+              ? 'bg-red-600 text-white'
+              : 'bg-red-500 text-white hover:bg-red-600'
+          } py-2 px-4 rounded transition-colors`}
+        >
           My Profile
         </Link>
       </div>
