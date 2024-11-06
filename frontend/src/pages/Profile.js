@@ -7,7 +7,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 function Profile() {
@@ -18,6 +18,15 @@ function Profile() {
   const [password, setPassword] = useState('');
   const [userProfile, setUserProfile] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableProfile, setEditableProfile] = useState({
+    age: '',
+    sex: '',
+    height: '',
+    weight: '',
+    activity: '',
+    goals: ''
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -28,13 +37,25 @@ function Profile() {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             setUserProfile(userDoc.data());
+            // Initialize editable profile with existing data
+            if (userDoc.data().profile) {
+              setEditableProfile({
+                age: userDoc.data().profile.age || '',
+                sex: userDoc.data().profile.sex || '',
+                height: userDoc.data().profile.height || '',
+                weight: userDoc.data().profile.weight || '',
+                activity: userDoc.data().profile.activity || '',
+                goals: userDoc.data().profile.goals || ''
+              });
+            }
           } else {
             // Create a basic profile for new Google Sign-In users
             const basicProfile = {
               profile: {
                 email: user.email,
                 name: user.displayName,
-                photoURL: user.photoURL
+                photoURL: user.photoURL,
+                createdAt: serverTimestamp()
               }
             };
             await setDoc(doc(db, 'users', user.uid), basicProfile);
@@ -42,6 +63,7 @@ function Profile() {
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);
+          setError('Error loading profile data');
         }
       } else {
         setIsLoggedIn(false);
@@ -88,6 +110,58 @@ function Profile() {
     } catch (error) {
       setError(error.message);
     }
+  };
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      const currentDoc = await getDoc(userDocRef);
+      const currentData = currentDoc.exists() ? currentDoc.data() : {};
+
+      const updatedProfile = {
+        ...currentData,
+        profile: {
+          ...currentData.profile,
+          ...editableProfile,
+          updatedAt: serverTimestamp()
+        }
+      };
+
+      await setDoc(userDocRef, updatedProfile);
+      setUserProfile(updatedProfile);
+      setIsEditing(false);
+      setError('');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setError('Failed to update profile');
+    }
+  };
+
+  const calculateBMR = (profile) => {
+    if (!profile?.sex || !profile?.weight || !profile?.height || !profile?.age) return null;
+    
+    // Mifflin-St Jeor Formula
+    const weight = parseFloat(profile.weight);
+    const height = parseFloat(profile.height);
+    const age = parseFloat(profile.age);
+    
+    if (isNaN(weight) || isNaN(height) || isNaN(age)) return null;
+
+    return profile.sex.toLowerCase() === 'male'
+      ? 10 * weight + 6.25 * height - 5 * age + 5
+      : 10 * weight + 6.25 * height - 5 * age - 161;
+  };
+
+  const getActivityMultiplier = (activity) => {
+    const multipliers = {
+      sedentary: 1.2,
+      light: 1.375,
+      moderate: 1.55,
+      heavy: 1.725,
+      athlete: 1.9
+    };
+    return multipliers[activity.toLowerCase()] || 1.2;
   };
 
   if (isLoading) {
@@ -140,7 +214,6 @@ function Profile() {
               {isRegistering ? 'Register' : 'Login'}
             </button>
             
-            {/* Google Sign-In Button */}
             <button
               type="button"
               onClick={handleGoogleSignIn}
@@ -188,181 +261,257 @@ function Profile() {
     <div className="container mx-auto p-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-4xl font-bold">My Profile</h1>
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
-        >
-          Logout
-        </button>
+        <div className="flex gap-4">
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600"
+            >
+              Edit Profile
+            </button>
+          )}
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
-            {userProfile?.profile && (
+      {error && (
+        <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {isEditing ? (
+        <form onSubmit={handleProfileUpdate} className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-2">Age</label>
+              <input
+                type="number"
+                value={editableProfile.age}
+                onChange={(e) => setEditableProfile(prev => ({...prev, age: e.target.value}))}
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+                placeholder="Enter age"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-2">Sex</label>
+              <select
+                value={editableProfile.sex}
+                onChange={(e) => setEditableProfile(prev => ({...prev, sex: e.target.value}))}
+                className="shadow border rounded w-full py-2 px-3 text-gray-700"
+              >
+                <option value="">Select sex</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-2">Height (cm)</label>
+              <input
+                type="number"
+                value={editableProfile.height}
+                onChange={(e) => setEditableProfile(prev => ({...prev, height: e.target.value}))}
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+                placeholder="Enter height in cm"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-2">Weight (kg)</label>
+              <input
+                type="number"
+                value={editableProfile.weight}
+                onChange={(e) => setEditableProfile(prev => ({...prev, weight: e.target.value}))}
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+                placeholder="Enter weight in kg"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-2">Activity Level</label>
+              <select
+                value={editableProfile.activity}
+                onChange={(e) => setEditableProfile(prev => ({...prev, activity: e.target.value}))}
+                className="shadow border rounded w-full py-2 px-3 text-gray-700"
+              >
+                <option value="">Select activity level</option>
+                <option value="sedentary">Sedentary</option>
+                <option value="light">Light</option>
+                <option value="moderate">Moderate</option>
+                <option value="heavy">Heavy</option>
+                <option value="athlete">Athlete</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-gray-700 text-sm font-bold mb-2">Health Goals</label>
+              <textarea
+                value={editableProfile.goals}
+                onChange={(e) => setEditableProfile(prev => ({...prev, goals: e.target.value}))}
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+                placeholder="Enter your health goals"
+                rows={4}
+              />
+            </div>
+          </div>
+          <div className="flex gap-4 mt-6">
+            <button
+              type="submit"
+              className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600"
+            >
+              Save Changes
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+            >
+              Cancel
+              </button>
+          </div>
+        </form>
+      ) : userProfile?.profile ? (
         <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
-            <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Profile Information</h2>
             <span className="text-sm text-gray-500">
-                {userProfile.profile.updatedAt ? 
-                `Last updated: ${new Date(userProfile.profile.updatedAt).toLocaleDateString()}` 
+              {userProfile.profile.updatedAt ? 
+                `Last updated: ${new Date(userProfile.profile.updatedAt.toDate()).toLocaleDateString()}` 
                 : ''}
             </span>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Basic Info */}
             <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-800 mb-3">Basic Information</h3>
-                <div className="space-y-2">
+              <h3 className="font-medium text-gray-800 mb-3">Basic Information</h3>
+              <div className="space-y-2">
                 {userProfile.profile.name && (
-                    <div className="flex justify-between">
+                  <div className="flex justify-between">
                     <span className="text-gray-600">Name:</span>
                     <span className="font-medium">{userProfile.profile.name}</span>
-                    </div>
+                  </div>
                 )}
                 <div className="flex justify-between">
-                    <span className="text-gray-600">Email:</span>
-                    <span className="font-medium">{userProfile.profile.email}</span>
+                  <span className="text-gray-600">Email:</span>
+                  <span className="font-medium">{userProfile.profile.email}</span>
                 </div>
                 {userProfile.profile.age && (
-                    <div className="flex justify-between">
+                  <div className="flex justify-between">
                     <span className="text-gray-600">Age:</span>
                     <span className="font-medium">{userProfile.profile.age}</span>
-                    </div>
+                  </div>
                 )}
                 {userProfile.profile.sex && (
-                    <div className="flex justify-between">
+                  <div className="flex justify-between">
                     <span className="text-gray-600">Sex:</span>
                     <span className="font-medium">{userProfile.profile.sex}</span>
-                    </div>
+                  </div>
                 )}
-                </div>
+              </div>
             </div>
 
             {/* Physical Metrics */}
             <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-800 mb-3">Physical Metrics</h3>
-                <div className="space-y-2">
+              <h3 className="font-medium text-gray-800 mb-3">Physical Metrics</h3>
+              <div className="space-y-2">
                 {userProfile.profile.height && (
-                    <div className="flex justify-between">
+                  <div className="flex justify-between">
                     <span className="text-gray-600">Height:</span>
                     <span className="font-medium">{userProfile.profile.height} cm</span>
-                    </div>
+                  </div>
                 )}
                 {userProfile.profile.weight && (
-                    <div className="flex justify-between">
+                  <div className="flex justify-between">
                     <span className="text-gray-600">Weight:</span>
                     <span className="font-medium">{userProfile.profile.weight} kg</span>
-                    </div>
+                  </div>
                 )}
                 {userProfile.profile.height && userProfile.profile.weight && (
-                    <div className="flex justify-between">
+                  <div className="flex justify-between">
                     <span className="text-gray-600">BMI:</span>
                     <span className="font-medium">
-                        {(userProfile.profile.weight / Math.pow(userProfile.profile.height / 100, 2)).toFixed(1)}
+                      {(userProfile.profile.weight / Math.pow(userProfile.profile.height / 100, 2)).toFixed(1)}
                     </span>
-                    </div>
+                  </div>
                 )}
-                </div>
+              </div>
             </div>
 
             {/* Fitness Info */}
             <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-800 mb-3">Fitness Information</h3>
-                <div className="space-y-2">
+              <h3 className="font-medium text-gray-800 mb-3">Fitness Information</h3>
+              <div className="space-y-2">
                 {userProfile.profile.activity && (
-                    <div className="flex justify-between">
+                  <div className="flex justify-between">
                     <span className="text-gray-600">Activity Level:</span>
                     <span className="font-medium">{userProfile.profile.activity}</span>
-                    </div>
+                  </div>
                 )}
-                </div>
+              </div>
             </div>
-            </div>
+          </div>
 
-            {/* Health Goals Section */}
-            {userProfile.profile.goals && (
+          {/* Health Goals Section */}
+          {userProfile.profile.goals && (
             <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-800 mb-3">Health Goals</h3>
-                <p className="text-gray-700">{userProfile.profile.goals}</p>
+              <h3 className="font-medium text-gray-800 mb-3">Health Goals</h3>
+              <p className="text-gray-700">{userProfile.profile.goals}</p>
             </div>
-            )}
+          )}
 
-            {/* Calculated Metrics */}
-            {userProfile.profile.weight && userProfile.profile.height && userProfile.profile.age && userProfile.profile.sex && (
+          {/* Calculated Metrics */}
+          {userProfile.profile.weight && userProfile.profile.height && userProfile.profile.age && userProfile.profile.sex && (
             <div className="mt-6 bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-medium text-blue-800 mb-3">Daily Caloric Needs</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center">
-                    <div className="text-sm text-blue-600">BMR</div>
-                    <div className="font-bold text-lg">
-                    {Math.round(
-                        userProfile.profile.sex === 'male'
-                        ? 10 * userProfile.profile.weight + 6.25 * userProfile.profile.height - 5 * userProfile.profile.age + 5
-                        : 10 * userProfile.profile.weight + 6.25 * userProfile.profile.height - 5 * userProfile.profile.age - 161
-                    )} 
-                    kcal
-                    </div>
+              <h3 className="font-medium text-blue-800 mb-3">Daily Caloric Needs</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                  <div className="text-sm text-blue-600">Basal Metabolic Rate (BMR)</div>
+                  <div className="font-bold text-lg">
+                    {Math.round(calculateBMR(userProfile.profile))} kcal
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Calories burned at complete rest</div>
                 </div>
-                <div className="text-center">
-                    <div className="text-sm text-blue-600">Maintenance</div>
-                    <div className="font-bold text-lg">
-                    {Math.round(
-                        (userProfile.profile.sex === 'male'
-                        ? 10 * userProfile.profile.weight + 6.25 * userProfile.profile.height - 5 * userProfile.profile.age + 5
-                        : 10 * userProfile.profile.weight + 6.25 * userProfile.profile.height - 5 * userProfile.profile.age - 161) *
-                        (userProfile.profile.activity === 'sedentary' ? 1.2 :
-                        userProfile.profile.activity === 'light' ? 1.375 :
-                        userProfile.profile.activity === 'moderate' ? 1.55 :
-                        userProfile.profile.activity === 'heavy' ? 1.725 :
-                        userProfile.profile.activity === 'athlete' ? 1.9 : 1.2)
-                    )} 
-                    kcal
-                    </div>
-                </div>
-                <div className="text-center">
-                    <div className="text-sm text-blue-600">Weight Loss Target (-500 kcal)</div>
-                    <div className="font-bold text-lg">
-                    {Math.round(
-                        (userProfile.profile.sex === 'male'
-                        ? 10 * userProfile.profile.weight + 6.25 * userProfile.profile.height - 5 * userProfile.profile.age + 5
-                        : 10 * userProfile.profile.weight + 6.25 * userProfile.profile.height - 5 * userProfile.profile.age - 161) *
-                        (userProfile.profile.activity === 'sedentary' ? 1.2 :
-                        userProfile.profile.activity === 'light' ? 1.375 :
-                        userProfile.profile.activity === 'moderate' ? 1.55 :
-                        userProfile.profile.activity === 'heavy' ? 1.725 :
-                        userProfile.profile.activity === 'athlete' ? 1.9 : 1.2) - 500
-                    )} 
-                    kcal
-                    </div>
-                </div>
-                </div>
-            </div>
-            )}
-        </div>
-        )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
-          <h2 className="text-lg font-semibold mb-2">My Goals</h2>
-          <p className="text-gray-600">
-            {userProfile?.profile?.goals || 'No goals set yet.'}
-          </p>
+                <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                  <div className="text-sm text-blue-600">Maintenance Calories</div>
+                  <div className="font-bold text-lg">
+                    {Math.round(calculateBMR(userProfile.profile) * 
+                      getActivityMultiplier(userProfile.profile.activity))} kcal
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Daily calories to maintain weight</div>
+                </div>
+
+                <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                  <div className="text-sm text-blue-600">Weight Loss Target</div>
+                  <div className="font-bold text-lg">
+                    {Math.round(calculateBMR(userProfile.profile) * 
+                      getActivityMultiplier(userProfile.profile.activity) - 500)} kcal
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">500 calorie deficit for weight loss</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-        
-        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
-          <h2 className="text-lg font-semibold mb-2">Workout Plan</h2>
-          <p className="text-gray-600">Details about the workout plan.</p>
+      ) : (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                Your profile is not complete. Click 'Edit Profile' to add your information.
+              </p>
+            </div>
+          </div>
         </div>
-        
-        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
-          <h2 className="text-lg font-semibold mb-2">Diet Plan</h2>
-          <p className="text-gray-600">Details about the diet plan.</p>
-        </div>
-        
-        <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
-          <h2 className="text-lg font-semibold mb-2">Google Calendar API</h2>
-          <p className="text-gray-600">Integration with Google Calendar.</p>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

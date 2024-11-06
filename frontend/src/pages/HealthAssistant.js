@@ -7,7 +7,8 @@ import {
   doc, 
   getDoc, 
   setDoc, 
-  updateDoc 
+  updateDoc,
+  serverTimestamp 
 } from 'firebase/firestore';
 
 const INITIAL_MESSAGE = `Hi! I'm your personal health assistant. To help you better, I'd like to know a few things about you:
@@ -20,12 +21,15 @@ const INITIAL_MESSAGE = `Hi! I'm your personal health assistant. To help you bet
 
 Please provide these details so I can give you personalized advice.`;
 
+const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today? If you need to update your profile information, just say 'update profile' and I'll help you with that.";
+
 function HealthAssistant() {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const chatContainerRef = useRef(null);
 
   // Listen for auth state changes
@@ -51,6 +55,12 @@ function HealthAssistant() {
     }
   }, [messages]);
 
+  const isProfileComplete = (profile) => {
+    if (!profile) return false;
+    const requiredFields = ['age', 'sex', 'height', 'weight', 'activity', 'goals'];
+    return requiredFields.every(field => profile[field]);
+  };
+
   const loadUserProfile = async (uid) => {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid));
@@ -58,19 +68,42 @@ function HealthAssistant() {
         const userData = userDoc.data();
         setUserProfile(userData.profile);
         
-        if (userData.chatHistory) {
-          setMessages(userData.chatHistory);
+        if (userData.chatHistory && userData.chatHistory.length > 0) {
+          const formattedHistory = userData.chatHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp
+          }));
+          setMessages(formattedHistory);
         } else {
           setMessages([{
             role: 'assistant',
-            content: `Welcome back! Here's your current profile:\n\nAge: ${userData.profile.age}\nSex: ${userData.profile.sex}\nHeight: ${userData.profile.height}cm\nWeight: ${userData.profile.weight}kg\nActivity Level: ${userData.profile.activity}\n\nYour Goals:\n${userData.profile.goals}\n\nHow can I help you today?`
+            content: isProfileComplete(userData.profile) ? WELCOME_BACK_MESSAGE : INITIAL_MESSAGE,
+            timestamp: new Date().toISOString()
           }]);
         }
       } else {
-        setMessages([{ role: 'assistant', content: INITIAL_MESSAGE }]);
+        await setDoc(doc(db, 'users', uid), {
+          createdAt: serverTimestamp(),
+          chatHistory: [{
+            role: 'assistant',
+            content: INITIAL_MESSAGE,
+            timestamp: new Date().toISOString()
+          }]
+        });
+        setMessages([{ 
+          role: 'assistant', 
+          content: INITIAL_MESSAGE,
+          timestamp: new Date().toISOString()
+        }]);
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
+      setMessages([{ 
+        role: 'assistant', 
+        content: 'Error loading profile. Please try again.',
+        timestamp: new Date().toISOString()
+      }]);
     }
   };
 
@@ -78,23 +111,18 @@ function HealthAssistant() {
     if (!userId) return;
     try {
       const userDocRef = doc(db, 'users', userId);
-      // Get existing user data first
       const userDoc = await getDoc(userDocRef);
+      const existingData = userDoc.exists() ? userDoc.data() : {};
       
       const updatedProfile = {
-        ...userDoc.exists() ? userDoc.data() : {},
+        ...existingData,
         profile: {
-          ...(userDoc.exists() ? userDoc.data().profile : {}),
-          age: profile.age,
-          sex: profile.sex,
-          height: profile.height,
-          weight: profile.weight,
-          activity: profile.activity,
-          goals: profile.goals,
+          ...(existingData.profile || {}),
+          ...profile,
           updatedAt: new Date().toISOString()
         }
       };
-  
+
       await setDoc(userDocRef, updatedProfile, { merge: true });
       return updatedProfile;
     } catch (error) {
@@ -103,12 +131,20 @@ function HealthAssistant() {
     }
   };
 
-  const saveChatHistory = async (messages) => {
+  const saveChatHistory = async (newMessages) => {
     if (!userId) return;
     try {
-      await updateDoc(doc(db, 'users', userId), {
-        chatHistory: messages.slice(-50), // Keep last 50 messages
-        updatedAt: new Date().toISOString()
+      const userDocRef = doc(db, 'users', userId);
+      
+      const messageHistory = newMessages.slice(-50).map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date().toISOString()
+      }));
+
+      await updateDoc(userDocRef, {
+        chatHistory: messageHistory,
+        lastInteraction: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error saving chat history:', error);
@@ -125,20 +161,28 @@ function HealthAssistant() {
     };
 
     const profile = {};
+    
+    // Log the message being processed (for debugging)
+    console.log('Processing message:', message);
+
     for (const [key, pattern] of Object.entries(patterns)) {
       const match = message.toLowerCase().match(pattern);
       if (match) {
-        profile[key] = match[0];
+        profile[key] = key === 'sex' ? match[0].toLowerCase() : match[0];
+        console.log(`Matched ${key}:`, profile[key]);
       }
     }
 
-    const goalsMatch = message.match(/goals:(.+?)(?=\n|$)/i) || 
-                      message.match(/\d\.\s(.+?)(?=\n|$)/g);
+    // Extract goals (everything after "goals:" or numbered list items)
+    const goalsMatch = message.match(/goals:\s*(.+?)(?=\n|$)/i) || 
+                      message.match(/6\.\s*(.+?)(?=\n|$)/);
     if (goalsMatch) {
-      profile.goals = goalsMatch[0];
+      profile.goals = goalsMatch[1].trim();
+      console.log('Matched goals:', profile.goals);
     }
 
-    return Object.keys(profile).length >= 5 ? profile : null;
+    console.log('Processed profile:', profile);
+    return Object.keys(profile).length >= 3 ? profile : null;
   };
 
   const callOpenAI = async (messageHistory) => {
@@ -164,11 +208,12 @@ function HealthAssistant() {
   };
 
   const handleSend = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || !userId) return;
 
     const newMessage = {
       role: 'user',
-      content: inputMessage
+      content: inputMessage,
+      timestamp: new Date().toISOString()
     };
 
     const updatedMessages = [...messages, newMessage];
@@ -177,11 +222,38 @@ function HealthAssistant() {
     setIsLoading(true);
 
     try {
-      if (!userProfile) {
+      // Check if user wants to update profile
+      if (inputMessage.toLowerCase().includes('update profile')) {
+        setIsUpdatingProfile(true);
+        const updateMessage = {
+          role: 'assistant',
+          content: INITIAL_MESSAGE,
+          timestamp: new Date().toISOString()
+        };
+        const finalMessages = [...updatedMessages, updateMessage];
+        setMessages(finalMessages);
+        await saveChatHistory(finalMessages);
+        setIsLoading(false);
+        return;
+      }
+
+      // Process profile information if updating or not set
+      if (isUpdatingProfile || !userProfile) {
         const profile = processUserProfile(inputMessage);
         if (profile) {
-          setUserProfile(profile);
           await saveUserProfile(profile);
+          setUserProfile(profile);
+          setIsUpdatingProfile(false);
+          const confirmMessage = {
+            role: 'assistant',
+            content: "Profile updated successfully! How may I help you today?",
+            timestamp: new Date().toISOString()
+          };
+          const finalMessages = [...updatedMessages, confirmMessage];
+          setMessages(finalMessages);
+          await saveChatHistory(finalMessages);
+          setIsLoading(false);
+          return;
         }
       }
 
@@ -201,6 +273,7 @@ function HealthAssistant() {
           4. Focus on evidence-based recommendations
           5. Be encouraging and supportive
           6. For mental health questions, provide general guidance and recommend professional help when appropriate
+          7. If user asks to update profile, guide them through the update process
           
           Always maintain a professional yet friendly tone.`
         },
@@ -210,15 +283,18 @@ function HealthAssistant() {
       const response = await callOpenAI(messageHistory);
       const finalMessages = [...updatedMessages, { 
         role: 'assistant', 
-        content: response 
+        content: response,
+        timestamp: new Date().toISOString()
       }];
       
       setMessages(finalMessages);
       await saveChatHistory(finalMessages);
     } catch (error) {
+      console.error('Error in chat interaction:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: "I apologize, but I encountered an error. Please try again."
+        content: "I apologize, but I encountered an error. Please try again.",
+        timestamp: new Date().toISOString()
       }]);
     }
 
@@ -242,7 +318,15 @@ function HealthAssistant() {
       {/* User Profile Display */}
       {userProfile && (
         <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
-          <h2 className="text-lg font-semibold mb-2">Your Profile</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold mb-2">Your Profile</h2>
+            <button
+              onClick={() => setIsUpdatingProfile(true)}
+              className="text-sm text-blue-500 hover:text-blue-700"
+            >
+              Update Profile
+            </button>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="font-medium">Age:</span> {userProfile.age}
@@ -310,8 +394,8 @@ function HealthAssistant() {
             )}
           </div>
 
-          {/* Input area */}
-          <div className="flex gap-3">
+         {/* Input area */}
+         <div className="flex gap-3">
             <input
               type="text"
               value={inputMessage}
@@ -323,12 +407,41 @@ function HealthAssistant() {
             <button 
               onClick={handleSend}
               className="px-8 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+              disabled={isLoading}
             >
-              Send
+              {isLoading ? (
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Sending...
+                </div>
+              ) : (
+                'Send'
+              )}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Notification for profile updates */}
+      {isUpdatingProfile && (
+        <div className="fixed bottom-4 right-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded shadow-lg">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm">
+                Profile update mode active. Please provide your updated information.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
