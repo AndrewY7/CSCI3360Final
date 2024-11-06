@@ -2,7 +2,7 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://https://github.com/AndrewY7/CSCI3360Final",
+  "homepage": "https://AndrewY7.github.io/CSCI3360Final/",
   "dependencies": {
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
     "@testing-library/jest-dom": "^5.17.0",

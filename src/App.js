@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import About from './pages/About';
@@ -9,13 +9,15 @@ import HealthAssistant from './pages/HealthAssistant';
 function App() {
   return (
     <Router>
-      <Navbar />
-      <div className="container mx-auto p-4">
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Navigate to="/profile" replace />} />
+          
+          <Route path="/home" element={<Home />} />
           <Route path="/about" element={<About />} />
-          <Route path="/healthassistant" element={<HealthAssistant />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/healthassistant" element={<HealthAssistant />} />
         </Routes>
       </div>
     </Router>
