@@ -11,9 +11,6 @@ function Navbar() {
       
       {/* Navigation items and profile button grouped together */}
       <div className="flex items-center space-x-6">
-        <Link to="/" className="text-gray-700 hover:text-black">
-          Home
-        </Link>
         <Link to="/about" className="text-gray-700 hover:text-black">
           About
         </Link>
