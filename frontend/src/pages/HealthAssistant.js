@@ -19,7 +19,7 @@ const INITIAL_MESSAGE = `Hi! I'm your personal health assistant. To help you bet
 5. Your physical activity level (sedentary/light/moderate/heavy/athlete)
 6. Your health goals
 
-Please provide these details so I can give you personalized advice.`;
+Please provide these details so I can give you personalized advice. To save this information, please create an account and log in.`;
 
 const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today? If you need to update your profile information, just say 'update profile' and I'll help you with that.";
 
