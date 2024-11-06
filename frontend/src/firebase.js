@@ -3,13 +3,14 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID
-};
+    apiKey: "AIzaSyAXcR3T3b1n2Si60NpBbgQvvz7QF8HeEbE",
+    authDomain: "healthai-780dc.firebaseapp.com",
+    projectId: "healthai-780dc",
+    storageBucket: "healthai-780dc.firebasestorage.app",
+    messagingSenderId: "321626895600",
+    appId: "1:321626895600:web:31a3adf86bab853d01be35",
+    measurementId: "G-K14FSKC8GR"
+  };
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

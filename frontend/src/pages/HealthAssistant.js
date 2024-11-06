@@ -1,22 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-
-// Firebase configuration - Replace with your config
-const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-auth-domain",
-  projectId: "your-project-id",
-  storageBucket: "your-storage-bucket",
-  messagingSenderId: "your-messaging-sender-id",
-  appId: "your-app-id"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+import { auth, db } from '../firebase';
+import { 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc 
+} from 'firebase/firestore';
 
 const INITIAL_MESSAGE = `Hi! I'm your personal health assistant. To help you better, I'd like to know a few things about you:
 1. Your age
@@ -85,12 +77,29 @@ function HealthAssistant() {
   const saveUserProfile = async (profile) => {
     if (!userId) return;
     try {
-      await setDoc(doc(db, 'users', userId), {
-        profile,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+      const userDocRef = doc(db, 'users', userId);
+      // Get existing user data first
+      const userDoc = await getDoc(userDocRef);
+      
+      const updatedProfile = {
+        ...userDoc.exists() ? userDoc.data() : {},
+        profile: {
+          ...(userDoc.exists() ? userDoc.data().profile : {}),
+          age: profile.age,
+          sex: profile.sex,
+          height: profile.height,
+          weight: profile.weight,
+          activity: profile.activity,
+          goals: profile.goals,
+          updatedAt: new Date().toISOString()
+        }
+      };
+  
+      await setDoc(userDocRef, updatedProfile, { merge: true });
+      return updatedProfile;
     } catch (error) {
       console.error('Error saving user profile:', error);
+      throw error;
     }
   };
 
