@@ -7,26 +7,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// CORS configuration
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'https://andrewy7.github.io/CSCI3360Final/'  
-  ],
-  methods: ['GET', 'POST'],
-  credentials: true
+  origin: ['https://andrewy7.github.io', 'http://localhost:3000'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
@@ -34,7 +29,6 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api', chatRouter);
 
-// Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

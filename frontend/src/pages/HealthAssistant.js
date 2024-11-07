@@ -188,7 +188,7 @@ function HealthAssistant() {
   const callOpenAI = async (messageHistory) => {
     try {
       const BACKEND_URL = process.env.NODE_ENV === 'production' 
-        ? 'https://your-render-backend-url.onrender.com'  
+        ? 'https://healthai-tan2.onrender.com'  
         : 'http://localhost:3001';
   
       const response = await fetch(`${BACKEND_URL}/api/chat`, {  
@@ -197,6 +197,7 @@ function HealthAssistant() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ messages: messageHistory }),
+        credentials: 'omit'
       });
   
       if (!response.ok) {
