@@ -187,18 +187,22 @@ function HealthAssistant() {
 
   const callOpenAI = async (messageHistory) => {
     try {
-      const response = await fetch('http://localhost:3001/api/chat', {  
+      const BACKEND_URL = process.env.NODE_ENV === 'production' 
+        ? 'https://your-render-backend-url.onrender.com'  
+        : 'http://localhost:3001';
+  
+      const response = await fetch(`${BACKEND_URL}/api/chat`, {  
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ messages: messageHistory }),
       });
-
+  
       if (!response.ok) {
         throw new Error('Failed to get response from OpenAI');
       }
-
+  
       const data = await response.json();
       return data.message;
     } catch (error) {
