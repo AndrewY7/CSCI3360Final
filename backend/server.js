@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3001;
 const corsOptions = {
   origin: [
     'http://localhost:3000',
-    'https://andrewy7.github.io/CSCI3360Final/'  // Add your GitHub Pages domain
+    'https://andrewy7.github.io/CSCI3360Final/'  
   ],
   methods: ['GET', 'POST'],
   credentials: true
