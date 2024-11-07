@@ -213,78 +213,82 @@ function HealthAssistant() {
   };
 
   const handleSend = async () => {
-    if (!inputMessage.trim() || !userId) return;
-
+    if (!inputMessage.trim()) return;
+  
     const newMessage = {
       role: 'user',
       content: inputMessage,
       timestamp: new Date().toISOString()
     };
-
+  
     const updatedMessages = [...messages, newMessage];
     setMessages(updatedMessages);
     setInputMessage('');
     setIsLoading(true);
-
+  
     try {
-      // Check if user wants to update profile
-      if (inputMessage.toLowerCase().includes('update profile')) {
-        setIsUpdatingProfile(true);
-        const updateMessage = {
-          role: 'assistant',
-          content: INITIAL_MESSAGE,
-          timestamp: new Date().toISOString()
-        };
-        const finalMessages = [...updatedMessages, updateMessage];
-        setMessages(finalMessages);
-        await saveChatHistory(finalMessages);
-        setIsLoading(false);
-        return;
-      }
-
-      // Process profile information if updating or not set
-      if (isUpdatingProfile || !userProfile) {
-        const profile = processUserProfile(inputMessage);
-        if (profile) {
-          await saveUserProfile(profile);
-          setUserProfile(profile);
-          setIsUpdatingProfile(false);
-          const confirmMessage = {
+      // Profile-related actions only for logged-in users
+      if (userId) {
+        // Check if user wants to update profile
+        if (inputMessage.toLowerCase().includes('update profile')) {
+          setIsUpdatingProfile(true);
+          const updateMessage = {
             role: 'assistant',
-            content: "Profile updated successfully! How may I help you today?",
+            content: INITIAL_MESSAGE,
             timestamp: new Date().toISOString()
           };
-          const finalMessages = [...updatedMessages, confirmMessage];
+          const finalMessages = [...updatedMessages, updateMessage];
           setMessages(finalMessages);
           await saveChatHistory(finalMessages);
           setIsLoading(false);
           return;
         }
+  
+        // Process profile information if updating or not set
+        if (isUpdatingProfile || !userProfile) {
+          const profile = processUserProfile(inputMessage);
+          if (profile) {
+            await saveUserProfile(profile);
+            setUserProfile(profile);
+            setIsUpdatingProfile(false);
+            const confirmMessage = {
+              role: 'assistant',
+              content: "Profile updated successfully! How may I help you today?",
+              timestamp: new Date().toISOString()
+            };
+            const finalMessages = [...updatedMessages, confirmMessage];
+            setMessages(finalMessages);
+            await saveChatHistory(finalMessages);
+            setIsLoading(false);
+            return;
+          }
+        }
       }
-
+  
+      // Prepare message history with appropriate system message
       const messageHistory = [
         {
           role: 'system',
           content: `You are a helpful health assistant. ${
-            userProfile ? 
+            userId && userProfile ? 
             `User profile: Age: ${userProfile.age}, Sex: ${userProfile.sex}, Height: ${userProfile.height}cm, Weight: ${userProfile.weight}kg, Activity: ${userProfile.activity}\nGoals: ${userProfile.goals}` 
-            : 'Still collecting user profile information.'
+            : 'No profile information available. Provide general health advice and inform user they can save their profile by logging in.'
           }
           
           Key responsibilities:
-          1. If user profile is not set, focus on collecting missing profile information
-          2. Once profile is set, provide personalized health advice
+          1. ${userId ? 'If user profile is not set, focus on collecting missing profile information' : 'Provide general health advice'}
+          2. ${userId ? 'Once profile is set, provide personalized health advice' : 'Recommend logging in for personalized advice'}
           3. Use Mifflin-St Jeor Formula for caloric calculations when relevant
           4. Focus on evidence-based recommendations
           5. Be encouraging and supportive
           6. For mental health questions, provide general guidance and recommend professional help when appropriate
-          7. If user asks to update profile, guide them through the update process
+          7. ${userId ? 'If user asks to update profile, guide them through the update process' : 'If user asks about profile features, inform them they need to log in'}
           
           Always maintain a professional yet friendly tone.`
         },
         ...updatedMessages
       ];
-
+  
       const response = await callOpenAI(messageHistory);
       const finalMessages = [...updatedMessages, { 
         role: 'assistant', 
@@ -293,7 +297,11 @@ function HealthAssistant() {
       }];
       
       setMessages(finalMessages);
-      await saveChatHistory(finalMessages);
+      
+      // Only save chat history for logged-in users
+      if (userId) {
+        await saveChatHistory(finalMessages);
+      }
     } catch (error) {
       console.error('Error in chat interaction:', error);
       setMessages(prev => [...prev, {
@@ -302,7 +310,7 @@ function HealthAssistant() {
         timestamp: new Date().toISOString()
       }]);
     }
-
+  
     setIsLoading(false);
   };
 
@@ -319,6 +327,23 @@ function HealthAssistant() {
   return (
     <div className="w-[85%] mx-auto px-4 py-4">
       <h1 className="text-2xl font-bold text-center mb-6">Health Assistant</h1>
+
+      {!userId && (
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-blue-700">
+                You're using the chat assistant in guest mode. To save your chat history and get personalized recommendations, please log in or create an account.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* User Profile Display */}
       {userProfile && (
