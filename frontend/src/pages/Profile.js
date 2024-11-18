@@ -11,6 +11,8 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
+
+
 function Profile() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +30,11 @@ function Profile() {
     activity: '',
     goals: ''
   });
+  const [selectedMetrics, setSelectedMetrics] = useState({
+    weight: true,
+    bmi: true
+  });
+  const [timeRange, setTimeRange] = useState('all');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -119,16 +126,25 @@ function Profile() {
       const userDocRef = doc(db, 'users', auth.currentUser.uid);
       const currentDoc = await getDoc(userDocRef);
       const currentData = currentDoc.exists() ? currentDoc.data() : {};
-
+  
+      const newBMI = (editableProfile.weight / Math.pow(editableProfile.height / 100, 2)).toFixed(1);
+      
+      const historyEntry = {
+        weight: parseFloat(editableProfile.weight),
+        bmi: parseFloat(newBMI),
+        date: new Date().toISOString(),
+      };
+  
       const updatedProfile = {
         ...currentData,
         profile: {
           ...currentData.profile,
           ...editableProfile,
           updatedAt: serverTimestamp()
-        }
+        },
+        metricsHistory: [...(currentData.metricsHistory || []), historyEntry]
       };
-
+  
       await setDoc(userDocRef, updatedProfile);
       setUserProfile(updatedProfile);
       setIsEditing(false);
@@ -152,6 +168,27 @@ function Profile() {
     return profile.sex.toLowerCase() === 'male'
       ? 10 * weight + 6.25 * height - 5 * age + 5
       : 10 * weight + 6.25 * height - 5 * age - 161;
+  };
+
+  const getFilteredData = (history) => {
+    if (!history) return [];
+    
+    const now = new Date();
+    const filtered = history.filter(entry => {
+      const entryDate = new Date(entry.date);
+      switch (timeRange) {
+        case 'week':
+          return now - entryDate <= 7 * 24 * 60 * 60 * 1000;
+        case 'month':
+          return now - entryDate <= 30 * 24 * 60 * 60 * 1000;
+        case 'year':
+          return now - entryDate <= 365 * 24 * 60 * 60 * 1000;
+        default:
+          return true;
+      }
+    });
+    
+    return filtered;
   };
 
   const getActivityMultiplier = (activity) => {
@@ -496,6 +533,114 @@ function Profile() {
               </div>
             </div>
           )}
+
+          {/* Progress Chart */}
+          {userProfile?.metricsHistory && userProfile.metricsHistory.length > 0 && (
+            <div className="mt-6 bg-white p-4 rounded-lg shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-medium text-blue-800">Progress Tracking</h3>
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Show:</label>
+                    <div className="flex gap-2">
+                      <label className="inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedMetrics.weight}
+                          onChange={() => setSelectedMetrics(prev => ({...prev, weight: !prev.weight}))}
+                          className="form-checkbox h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2 text-sm">Weight</span>
+                      </label>
+                      <label className="inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedMetrics.bmi}
+                          onChange={() => setSelectedMetrics(prev => ({...prev, bmi: !prev.bmi}))}
+                          className="form-checkbox h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2 text-sm">BMI</span>
+                      </label>
+                    </div>
+                  </div>
+                  <select
+                    value={timeRange}
+                    onChange={(e) => setTimeRange(e.target.value)}
+                    className="text-sm border rounded px-2 py-1"
+                  >
+                    <option value="week">Last Week</option>
+                    <option value="month">Last Month</option>
+                    <option value="year">Last Year</option>
+                    <option value="all">All Time</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="h-[400px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={getFilteredData(userProfile.metricsHistory)}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(date) => new Date(date).toLocaleDateString()}
+                    />
+                    <YAxis yAxisId="weight" orientation="left" stroke="#2563eb" domain={['auto', 'auto']} />
+                    <YAxis yAxisId="bmi" orientation="right" stroke="#dc2626" domain={[15, 35]} />
+                    <Tooltip
+                      labelFormatter={(date) => new Date(date).toLocaleDateString()}
+                      formatter={(value, name) => [value.toFixed(1), name]}
+                    />
+                    <Legend />
+                    {selectedMetrics.weight && (
+                      <Line
+                        yAxisId="weight"
+                        type="monotone"
+                        dataKey="weight"
+                        stroke="#2563eb"
+                        name="Weight (kg)"
+                        dot={true}
+                        connectNulls
+                      />
+                    )}
+                    {selectedMetrics.bmi && (
+                      <Line
+                        yAxisId="bmi"
+                        type="monotone"
+                        dataKey="bmi"
+                        stroke="#dc2626"
+                        name="BMI"
+                        dot={true}
+                        connectNulls
+                      />
+                    )}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* BMI Scale Reference */}
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">BMI Reference Scale:</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="text-xs">
+                    <span className="font-medium">Underweight:</span> &lt; 18.5
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-medium">Normal:</span> 18.5 - 24.9
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-medium">Overweight:</span> 25 - 29.9
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-medium">Obese:</span> ≥ 30
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
         </div>
       ) : (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
