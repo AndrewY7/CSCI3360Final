@@ -624,14 +624,7 @@ function Profile() {
                     )}
                   </LineChart>
                 </ResponsiveContainer>
-              </div> 
-              ) : (
-                <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    No progress data available yet. Update your profile to start tracking your progress.
-                  </p>
-                </div>
-              )}
+              </div>
 
               {/* BMI Scale Reference */}
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
@@ -651,6 +644,12 @@ function Profile() {
                   </div>
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">
+                No progress data available yet. Update your profile to start tracking your progress.
+              </p>
             </div>
           )}
           
