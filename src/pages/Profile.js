@@ -541,7 +541,7 @@ function Profile() {
           )}
 
           {/* Progress Chart */}
-          {userProfile?.metricsHistory && userProfile.metricsHistory.length > 0 && (
+          {userProfile?.metricsHistory ? (
             <div className="mt-6 bg-white p-4 rounded-lg shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-medium text-blue-800">Progress Tracking</h3>
@@ -624,7 +624,14 @@ function Profile() {
                     )}
                   </LineChart>
                 </ResponsiveContainer>
-              </div>
+              </div> 
+              ) : (
+                <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    No progress data available yet. Update your profile to start tracking your progress.
+                  </p>
+                </div>
+              )}
 
               {/* BMI Scale Reference */}
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
