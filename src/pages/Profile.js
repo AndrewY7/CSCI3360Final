@@ -141,20 +141,30 @@ function Profile() {
         date: new Date().toISOString(),
       };
   
+      const now = new Date();
+  
       const updatedProfile = {
         ...currentData,
         profile: {
           ...currentData.profile,
           ...editableProfile,
-          updatedAt: serverTimestamp()
+          updatedAt: now.toISOString() 
         },
         metricsHistory: [...(currentData.metricsHistory || []), historyEntry]
       };
   
-      await setDoc(userDocRef, updatedProfile);
+      await setDoc(userDocRef, {
+        ...updatedProfile,
+        profile: {
+          ...updatedProfile.profile,
+          updatedAt: serverTimestamp() 
+        }
+      });
+  
       setUserProfile(updatedProfile);
       setIsEditing(false);
       setError('');
+  
     } catch (error) {
       console.error('Error updating profile:', error);
       setError('Failed to update profile');
@@ -422,7 +432,7 @@ function Profile() {
             <h2 className="text-xl font-semibold">Profile Information</h2>
             <span className="text-sm text-gray-500">
               {userProfile.profile.updatedAt ? 
-                `Last updated: ${new Date(userProfile.profile.updatedAt.toDate()).toLocaleDateString()}` 
+                `Last updated: ${new Date(userProfile.profile.updatedAt).toLocaleDateString()}` 
                 : ''}
             </span>
           </div>
