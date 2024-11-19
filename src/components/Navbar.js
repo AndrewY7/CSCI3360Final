@@ -5,9 +5,9 @@ function Navbar() {
   const location = useLocation();
 
   return (
-    <nav className="bg-gradient-to-r from-red-500 to-red-600 shadow-lg py-4 px-8">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Logo and brand name */}
+    <nav className="bg-gradient-to-r from-red-500 to-red-600 shadow-lg py-4">
+      <div className="w-full flex justify-between items-center px-8">
+        {/* Logo and brand name - pushed to far left */}
         <Link to="/" className="flex items-center space-x-2">
           <div className="flex items-center text-3xl font-extrabold text-white" style={{ fontFamily: 'Montserrat, sans-serif' }}>
             <span>Health</span>
@@ -22,7 +22,7 @@ function Navbar() {
           </div>
         </Link>
 
-        {/* Navigation Links */}
+        {/* Navigation Links - pushed to far right */}
         <div className="flex items-center space-x-8">
           <Link 
             to="/about" 
