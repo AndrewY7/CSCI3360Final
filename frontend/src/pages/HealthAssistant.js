@@ -476,7 +476,7 @@ function HealthAssistant() {
             </button>
             <button 
               onClick={clearMessages}
-              className="px-4 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              className="px-8 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
             >
               Clear
             </button>
