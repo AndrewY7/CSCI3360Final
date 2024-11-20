@@ -196,12 +196,16 @@ function HealthAssistant() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages: messageHistory }),
+        body: JSON.stringify({ 
+          messages: messageHistory,
+          maxTokens: 2000 
+        }),
         credentials: 'omit'
       });
   
       if (!response.ok) {
-        throw new Error('Failed to get response from OpenAI');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to get response from OpenAI');
       }
   
       const data = await response.json();
