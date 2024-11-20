@@ -316,6 +316,27 @@ function HealthAssistant() {
     );
   };
 
+  const clearMessages = async () => {
+    if (!userId) return;
+    
+    const initialMessage = {
+      role: 'assistant',
+      content: isProfileComplete(userProfile) ? WELCOME_BACK_MESSAGE : INITIAL_MESSAGE,
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages([initialMessage]);
+    
+    try {
+      const userDocRef = doc(db, 'users', userId);
+      await updateDoc(userDocRef, {
+        chatHistory: [initialMessage]
+      });
+    } catch (error) {
+      console.error('Error clearing chat history:', error);
+    }
+  };
+
   return (
     <div className="w-[85%] mx-auto px-4 py-4">
       <h1 className="text-2xl font-bold text-center mb-6">Health Assistant</h1>
@@ -325,12 +346,14 @@ function HealthAssistant() {
         <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold mb-2">Your Profile</h2>
-            <button
-              onClick={() => setIsUpdatingProfile(true)}
-              className="text-sm text-blue-500 hover:text-blue-700"
-            >
-              Update Profile
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsUpdatingProfile(true)}
+                className="text-sm text-blue-500 hover:text-blue-700"
+              >
+                Update Profile
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
@@ -425,6 +448,12 @@ function HealthAssistant() {
               ) : (
                 'Send'
               )}
+            </button>
+            <button 
+              onClick={clearMessages}
+              className="px-4 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            >
+              Clear
             </button>
           </div>
         </div>
