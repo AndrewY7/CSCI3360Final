@@ -2,7 +2,7 @@ import React from 'react';
 
 function About() {
   return (
-    <div className="max-w-6xl mx-auto px-4 py-12" style={{ fontFamily: 'Nunito, sans-serif' }}>
+    <div className="max-w-6xl mx-auto px-4 py-12 font-[Nunito]">
       <h1 className="text-4xl font-extrabold text-center mb-12 text-gray-800">
         Welcome to Healthai Assistant
       </h1>
