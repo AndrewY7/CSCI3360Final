@@ -10,7 +10,7 @@ import {
   updateDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import InitialProfileForm from '../components/InitialProfileForm';
+import InitialProfileForm from '../ProfileForm';
 
 const WELCOME_MESSAGE = "Thanks for providing your information! How can I help you today?";
 const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today?";
