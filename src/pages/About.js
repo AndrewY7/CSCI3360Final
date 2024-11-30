@@ -59,15 +59,6 @@ function About() {
               please consult healthcare professionals for specific mental health concerns.
             </p>
           </div>
-
-          <div>
-            <h3 className="text-lg font-medium text-red-600 mb-2">Calendar Integration</h3>
-            <p className="text-gray-700">
-              Seamlessly schedule your workouts using Google Calendar integration. The 
-              assistant helps you find the perfect time slots based on your availability 
-              and preferences.
-            </p>
-          </div>
         </div>
       </div>
 
@@ -79,7 +70,6 @@ function About() {
           <li className="ml-4">Share your health and fitness goals with the assistant</li>
           <li className="ml-4">Receive personalized recommendations and guidance</li>
           <li className="ml-4">Use the chat interface to ask questions and get real-time advice</li>
-          <li className="ml-4">Schedule and track your workouts through calendar integration</li>
         </ol>
         <div className="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-500">
           <p className="text-yellow-700">
