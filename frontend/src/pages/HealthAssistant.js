@@ -23,37 +23,194 @@ Please provide these details so I can give you personalized advice.`;
 
 const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today? If you need to update your profile information, just say 'update profile' and I'll help you with that.";
 
-// Helper function to calculate BMI
-const calculateBMI = (height, weight) => {
-  const heightInMeters = height / 100;
-  return (weight / (heightInMeters * heightInMeters)).toFixed(1);
-};
+function HealthAssistant() {
+  const [messages, setMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const chatContainerRef = useRef(null);
 
-// Helper function to calculate daily calorie needs using Mifflin-St Jeor Formula
-const calculateCalories = (profile) => {
-  const { age, sex, height, weight, activity } = profile;
-  let bmr;
-  
-  if (sex === 'male') {
-    bmr = 10 * weight + 6.25 * height - 5 * age + 5;
-  } else {
-    bmr = 10 * weight + 6.25 * height - 5 * age - 161;
-  }
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserId(user.uid);
+        await loadUserProfile(user.uid);
+      } else {
+        setUserId(null);
+        setUserProfile(null);
+        setMessages([{ role: 'assistant', content: INITIAL_MESSAGE }]);
+      }
+    });
 
-  const activityFactors = {
-    sedentary: 1.2,
-    light: 1.375,
-    moderate: 1.55,
-    heavy: 1.725,
-    athlete: 1.9
+    return () => unsubscribe();
+  }, []);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const isProfileComplete = (profile) => {
+    if (!profile) return false;
+    const requiredFields = ['age', 'sex', 'height', 'weight', 'activity', 'goals'];
+    return requiredFields.every(field => profile[field]);
   };
 
-  return Math.round(bmr * activityFactors[activity.toLowerCase()]);
-};
+  const loadUserProfile = async (uid) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setUserProfile(userData.profile);
+        
+        if (userData.chatHistory && userData.chatHistory.length > 0) {
+          const formattedHistory = userData.chatHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp
+          }));
+          setMessages(formattedHistory);
+        } else {
+          setMessages([{
+            role: 'assistant',
+            content: isProfileComplete(userData.profile) ? WELCOME_BACK_MESSAGE : INITIAL_MESSAGE,
+            timestamp: new Date().toISOString()
+          }]);
+        }
+      } else {
+        await setDoc(doc(db, 'users', uid), {
+          createdAt: serverTimestamp(),
+          chatHistory: [{
+            role: 'assistant',
+            content: INITIAL_MESSAGE,
+            timestamp: new Date().toISOString()
+          }]
+        });
+        setMessages([{ 
+          role: 'assistant', 
+          content: INITIAL_MESSAGE,
+          timestamp: new Date().toISOString()
+        }]);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      setMessages([{ 
+        role: 'assistant', 
+        content: 'Error loading profile. Please try again.',
+        timestamp: new Date().toISOString()
+      }]);
+    }
+  };
 
-function HealthAssistant() {
-  // [Previous state declarations and useEffects remain the same...]
-  [... Previous code until handleSend function ...]
+  const saveUserProfile = async (profile) => {
+    if (!userId) return;
+    try {
+      const userDocRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userDocRef);
+      const existingData = userDoc.exists() ? userDoc.data() : {};
+      
+      const updatedProfile = {
+        ...existingData,
+        profile: {
+          ...(existingData.profile || {}),
+          ...profile,
+          updatedAt: new Date().toISOString()
+        }
+      };
+
+      await setDoc(userDocRef, updatedProfile, { merge: true });
+      return updatedProfile;
+    } catch (error) {
+      console.error('Error saving user profile:', error);
+      throw error;
+    }
+  };
+
+  const saveChatHistory = async (newMessages) => {
+    if (!userId) return;
+    try {
+      const userDocRef = doc(db, 'users', userId);
+      
+      const messageHistory = newMessages.slice(-50).map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date().toISOString()
+      }));
+
+      await updateDoc(userDocRef, {
+        chatHistory: messageHistory,
+        lastInteraction: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error saving chat history:', error);
+    }
+  };
+
+  const processUserProfile = (message) => {
+    const patterns = {
+      age: /\b\d{1,2}\b/,
+      sex: /\b(male|female)\b/i,
+      height: /\b\d{2,3}\b(?=\s*cm)/,
+      weight: /\b\d{2,3}\b(?=\s*kg)/,
+      activity: /\b(sedentary|light|moderate|heavy|athlete)\b/i,
+    };
+
+    const profile = {};
+    
+    // Log the message being processed (for debugging)
+    console.log('Processing message:', message);
+
+    for (const [key, pattern] of Object.entries(patterns)) {
+      const match = message.toLowerCase().match(pattern);
+      if (match) {
+        profile[key] = key === 'sex' ? match[0].toLowerCase() : match[0];
+        console.log(`Matched ${key}:`, profile[key]);
+      }
+    }
+
+    // Extract goals (everything after "goals:" or numbered list items)
+    const goalsMatch = message.match(/goals:\s*(.+?)(?=\n|$)/i) || 
+                      message.match(/6\.\s*(.+?)(?=\n|$)/);
+    if (goalsMatch) {
+      profile.goals = goalsMatch[1].trim();
+      console.log('Matched goals:', profile.goals);
+    }
+
+    console.log('Processed profile:', profile);
+    return Object.keys(profile).length >= 3 ? profile : null;
+  };
+
+  const callOpenAI = async (messageHistory) => {
+    try {
+      const BACKEND_URL = process.env.NODE_ENV === 'production' 
+        ? 'https://healthai-tan2.onrender.com'  
+        : 'http://localhost:3001';
+  
+      const response = await fetch(`${BACKEND_URL}/api/chat`, {  
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: messageHistory }),
+        credentials: 'omit'
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to get response from OpenAI');
+      }
+  
+      const data = await response.json();
+      return data.message;
+    } catch (error) {
+      console.error('Error calling OpenAI:', error);
+      throw error;
+    }
+  };
 
   const handleSend = async () => {
     if (!inputMessage.trim()) return;
@@ -70,25 +227,54 @@ function HealthAssistant() {
     setIsLoading(true);
   
     try {
-      // Profile-related actions only for logged-in users
       if (userId) {
-        // [Previous profile update logic remains the same...]
+        if (inputMessage.toLowerCase().includes('update profile')) {
+          setIsUpdatingProfile(true);
+          const updateMessage = {
+            role: 'assistant',
+            content: INITIAL_MESSAGE,
+            timestamp: new Date().toISOString()
+          };
+          const finalMessages = [...updatedMessages, updateMessage];
+          setMessages(finalMessages);
+          await saveChatHistory(finalMessages);
+          setIsLoading(false);
+          return;
+        }
+  
+        if (isUpdatingProfile || !userProfile) {
+          const profile = processUserProfile(inputMessage);
+          if (profile) {
+            await saveUserProfile(profile);
+            setUserProfile(profile);
+            setIsUpdatingProfile(false);
+            const confirmMessage = {
+              role: 'assistant',
+              content: "Profile updated successfully! How may I help you today?",
+              timestamp: new Date().toISOString()
+            };
+            const finalMessages = [...updatedMessages, confirmMessage];
+            setMessages(finalMessages);
+            await saveChatHistory(finalMessages);
+            setIsLoading(false);
+            return;
+          }
+        }
       }
   
-      // Updated system message with refined prompt
       const messageHistory = [
         {
           role: 'system',
           content: `You are a helpful health assistant. ${
             userId && userProfile ? 
             `User Profile Summary:
-• Demographics: ${userProfile.age} year old ${userProfile.sex}
-• Physical Stats: Height ${userProfile.height}cm | Weight ${userProfile.weight}kg
-• BMI: ${calculateBMI(userProfile.height, userProfile.weight)}
-• Activity Level: ${userProfile.activity}
-• Personal Goals: ${userProfile.goals}
-• Calculated Daily Calorie Needs: ${calculateCalories(userProfile)}
-Please consider ALL profile elements when providing recommendations.` 
+              • Demographics: ${userProfile.age} year old ${userProfile.sex}
+              • Physical Stats: Height ${userProfile.height}cm | Weight ${userProfile.weight}kg
+              • BMI: ${calculateBMI(userProfile.height, userProfile.weight)}
+              • Activity Level: ${userProfile.activity}
+              • Personal Goals: ${userProfile.goals}
+              • Calculated Daily Calorie Needs: ${calculateCalories(userProfile)}
+              Please consider ALL profile elements when providing recommendations.` 
             : 'No profile information available. Provide general health advice and inform user they can save their profile by logging in.'
           }
           
@@ -155,29 +341,8 @@ Please consider ALL profile elements when providing recommendations.`
     );
   };
 
-  const clearMessages = async () => {
-    if (!userId) return;
-    
-    const initialMessage = {
-      role: 'assistant',
-      content: isProfileComplete(userProfile) ? WELCOME_BACK_MESSAGE : INITIAL_MESSAGE,
-      timestamp: new Date().toISOString()
-    };
-    
-    setMessages([initialMessage]);
-    
-    try {
-      const userDocRef = doc(db, 'users', userId);
-      await updateDoc(userDocRef, {
-        chatHistory: [initialMessage]
-      });
-    } catch (error) {
-      console.error('Error clearing chat history:', error);
-    }
-  };
-
   return (
-    <div className="w-[85%] mx-auto px-4 py-4">
+    <div className="w-[85%] mx-auto px-4 py-4 font-[Nunito]">
       <h1 className="text-2xl font-bold text-center mb-6">Health Assistant</h1>
 
       {!userId && (
@@ -202,14 +367,12 @@ Please consider ALL profile elements when providing recommendations.`
         <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold mb-2">Your Profile</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setIsUpdatingProfile(true)}
-                className="text-sm text-blue-500 hover:text-blue-700"
-              >
-                Update Profile
-              </button>
-            </div>
+            <button
+              onClick={() => setIsUpdatingProfile(true)}
+              className="text-sm text-blue-500 hover:text-blue-700"
+            >
+              Update Profile
+            </button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
