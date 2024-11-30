@@ -270,10 +270,8 @@ function HealthAssistant() {
             `User Profile Summary:
               • Demographics: ${userProfile.age} year old ${userProfile.sex}
               • Physical Stats: Height ${userProfile.height}cm | Weight ${userProfile.weight}kg
-              • BMI: ${calculateBMI(userProfile.height, userProfile.weight)}
               • Activity Level: ${userProfile.activity}
               • Personal Goals: ${userProfile.goals}
-              • Calculated Daily Calorie Needs: ${calculateCalories(userProfile)}
               Please consider ALL profile elements when providing recommendations.` 
             : 'No profile information available. Provide general health advice and inform user they can save their profile by logging in.'
           }
