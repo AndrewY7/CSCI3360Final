@@ -325,7 +325,7 @@ function HealthAssistant() {
   };
 
   return (
-    <div className="w-[85%] mx-auto px-4 py-4">
+    <div className="w-[85%] mx-auto px-4 py-4 font-[Nunito]">
       <h1 className="text-2xl font-bold text-center mb-6">Health Assistant</h1>
 
       {!userId && (
