@@ -16,7 +16,7 @@ function ProfileForm({ onSubmit, onCancel }) {
   };
 
   return (
-    <div className="bg-white rounded-lg p-6 shadow-md">
+    <div className="bg-white rounded-lg p-6 shadow-md font-[Nunito]">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Let's Get Started!</h2>
       <p className="text-gray-600 mb-6">
         To provide you with personalized health advice, please fill out the following information:
