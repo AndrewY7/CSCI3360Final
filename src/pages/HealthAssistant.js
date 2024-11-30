@@ -227,9 +227,7 @@ function HealthAssistant() {
     setIsLoading(true);
   
     try {
-      // Profile-related actions only for logged-in users
       if (userId) {
-        // Check if user wants to update profile
         if (inputMessage.toLowerCase().includes('update profile')) {
           setIsUpdatingProfile(true);
           const updateMessage = {
@@ -244,7 +242,6 @@ function HealthAssistant() {
           return;
         }
   
-        // Process profile information if updating or not set
         if (isUpdatingProfile || !userProfile) {
           const profile = processUserProfile(inputMessage);
           if (profile) {
@@ -265,13 +262,19 @@ function HealthAssistant() {
         }
       }
   
-      // Prepare message history with appropriate system message
       const messageHistory = [
         {
           role: 'system',
           content: `You are a helpful health assistant. ${
             userId && userProfile ? 
-            `User profile: Age: ${userProfile.age}, Sex: ${userProfile.sex}, Height: ${userProfile.height}cm, Weight: ${userProfile.weight}kg, Activity: ${userProfile.activity}\nGoals: ${userProfile.goals}` 
+            `User Profile Summary:
+              • Demographics: ${userProfile.age} year old ${userProfile.sex}
+              • Physical Stats: Height ${userProfile.height}cm | Weight ${userProfile.weight}kg
+              • BMI: ${calculateBMI(userProfile.height, userProfile.weight)}
+              • Activity Level: ${userProfile.activity}
+              • Personal Goals: ${userProfile.goals}
+              • Calculated Daily Calorie Needs: ${calculateCalories(userProfile)}
+              Please consider ALL profile elements when providing recommendations.` 
             : 'No profile information available. Provide general health advice and inform user they can save their profile by logging in.'
           }
           
@@ -283,6 +286,20 @@ function HealthAssistant() {
           5. Be encouraging and supportive
           6. For mental health questions, provide general guidance and recommend professional help when appropriate
           7. ${userId ? 'If user asks to update profile, guide them through the update process' : 'If user asks about profile features, inform them they need to log in'}
+          8. ALWAYS include relevant health disclaimers:
+             - General advice: "This advice is general in nature and may not suit everyone."
+             - Medical concerns: "Please consult healthcare provider for medical advice."
+             - Mental health: "For mental health support, contact qualified mental health professional."
+          9. Flag emergency situations immediately and provide emergency contact guidance.
+          10. Verify calculations twice before including numerical recommendations.
+
+          When providing recommendations, always structure your response as follows:
+          1. Profile-Based Context: Reference specific user details
+          2. Personalized Recommendation: Tailored to profile and goals
+          3. Scientific Basis: Brief evidence-based explanation
+          4. Practical Implementation: Step-by-step guidance
+          5. Safety Notice: Relevant disclaimers
+          6. Progress Tracking: Measurable metrics for success
           
           Always maintain a professional yet friendly tone.`
         },
