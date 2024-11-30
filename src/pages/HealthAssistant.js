@@ -130,13 +130,13 @@ function HealthAssistant() {
           createdAt: serverTimestamp(),
           chatHistory: [{
             role: 'assistant',
-            content: INITIAL_MESSAGE,
+            content: WELCOME_BACK_MESSAGE,
             timestamp: new Date().toISOString()
           }]
         });
         setMessages([{ 
           role: 'assistant', 
-          content: INITIAL_MESSAGE,
+          content: WELCOME_BACK_MESSAGE,
           timestamp: new Date().toISOString()
         }]);
       }
@@ -366,7 +366,7 @@ function HealthAssistant() {
   if (showInitialForm) {
     return (
       <div className="w-[85%] mx-auto px-4 py-8">
-        <InitialProfileForm 
+        <ProfileForm 
           onSubmit={handleProfileSubmit}
           onCancel={userId ? null : () => setShowInitialForm(false)}
         />
