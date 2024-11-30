@@ -10,18 +10,9 @@ import {
   updateDoc,
   serverTimestamp 
 } from 'firebase/firestore';
+import ProfileForm from './components/ProfileForm';
 
-const INITIAL_MESSAGE = `Hi! I'm your personal health assistant. To help you better, I'd like to know a few things about you:
-1. Your age
-2. Your sex (male/female)
-3. Your height (in cm)
-4. Your weight (in kg)
-5. Your physical activity level (sedentary/light/moderate/heavy/athlete)
-6. Your health goals
-
-Please provide these details so I can give you personalized advice.`;
-
-const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today? If you need to update your profile information, just say 'update profile' and I'll help you with that.";
+const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today?";
 
 function HealthAssistant() {
   const [messages, setMessages] = useState([]);
@@ -31,22 +22,46 @@ function HealthAssistant() {
   const [userId, setUserId] = useState(null);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const chatContainerRef = useRef(null);
+  const [showInitialForm, setShowInitialForm] = useState(false);
 
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserId(user.uid);
-        await loadUserProfile(user.uid);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists() || !userDoc.data().profile) {
+          setShowInitialForm(true);
+        } else {
+          await loadUserProfile(user.uid);
+        }
       } else {
         setUserId(null);
         setUserProfile(null);
-        setMessages([{ role: 'assistant', content: INITIAL_MESSAGE }]);
+        setShowInitialForm(true);
       }
     });
 
     return () => unsubscribe();
   }, []);
+
+  const handleProfileSubmit = async (profileData) => {
+    try {
+      if (userId) {
+        await saveUserProfile(profileData);
+      }
+      setUserProfile(profileData);
+      setShowInitialForm(false);
+      setMessages([{
+        role: 'assistant',
+        content: WELCOME_MESSAGE,
+        timestamp: new Date().toISOString()
+      }]);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setError('Failed to save profile');
+    }
+  };
 
   // Auto-scroll chat
   useEffect(() => {
@@ -338,6 +353,17 @@ function HealthAssistant() {
       </div>
     );
   };
+
+  if (showInitialForm) {
+    return (
+      <div className="w-[85%] mx-auto px-4 py-8">
+        <InitialProfileForm 
+          onSubmit={handleProfileSubmit}
+          onCancel={userId ? null : () => setShowInitialForm(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-[85%] mx-auto px-4 py-4 font-[Nunito]">
