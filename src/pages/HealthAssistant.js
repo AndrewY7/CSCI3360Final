@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import ProfileForm from './ProfileForm';
 
+const WELCOME_MESSAGE = "Thanks for providing your information! How can I help you today?";
 const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today?";
 
 function HealthAssistant() {
@@ -23,6 +24,7 @@ function HealthAssistant() {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const chatContainerRef = useRef(null);
   const [showInitialForm, setShowInitialForm] = useState(false);
+  const [error, setError] = useState('');
 
   // Listen for auth state changes
   useEffect(() => {
@@ -70,6 +72,31 @@ function HealthAssistant() {
     }
   }, [messages]);
 
+  const calculateBMR = (profile) => {
+    if (!profile?.sex || !profile?.weight || !profile?.height || !profile?.age) return null;
+    
+    const weight = parseFloat(profile.weight);
+    const height = parseFloat(profile.height);
+    const age = parseFloat(profile.age);
+    
+    if (isNaN(weight) || isNaN(height) || isNaN(age)) return null;
+  
+    return profile.sex.toLowerCase() === 'male'
+      ? 10 * weight + 6.25 * height - 5 * age + 5
+      : 10 * weight + 6.25 * height - 5 * age - 161;
+  };
+  
+  const getActivityMultiplier = (activity) => {
+    const multipliers = {
+      sedentary: 1.2,
+      light: 1.375,
+      moderate: 1.55,
+      heavy: 1.725,
+      athlete: 1.9
+    };
+    return multipliers[activity.toLowerCase()] || 1.2;
+  };
+  
   const getBMICategory = (bmi) => {
     if (bmi < 18.5) return 'Underweight';
     if (bmi < 25) return 'Normal weight';
