@@ -10,9 +10,8 @@ import {
   updateDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import InitialProfileForm from '../ProfileForm';
+import ProfileForm from './ProfileForm';
 
-const WELCOME_MESSAGE = "Thanks for providing your information! How can I help you today?";
 const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today?";
 
 function HealthAssistant() {
@@ -22,9 +21,8 @@ function HealthAssistant() {
   const [userProfile, setUserProfile] = useState(null);
   const [userId, setUserId] = useState(null);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [showInitialForm, setShowInitialForm] = useState(false);
-  const [error, setError] = useState('');
   const chatContainerRef = useRef(null);
+  const [showInitialForm, setShowInitialForm] = useState(false);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -47,12 +45,37 @@ function HealthAssistant() {
     return () => unsubscribe();
   }, []);
 
+  const handleProfileSubmit = async (profileData) => {
+    try {
+      if (userId) {
+        await saveUserProfile(profileData);
+      }
+      setUserProfile(profileData);
+      setShowInitialForm(false);
+      setMessages([{
+        role: 'assistant',
+        content: WELCOME_MESSAGE,
+        timestamp: new Date().toISOString()
+      }]);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setError('Failed to save profile');
+    }
+  };
+
   // Auto-scroll chat
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const getBMICategory = (bmi) => {
+    if (bmi < 18.5) return 'Underweight';
+    if (bmi < 25) return 'Normal weight';
+    if (bmi < 30) return 'Overweight';
+    return 'Obese';
+  };
 
   const loadUserProfile = async (uid) => {
     try {
@@ -76,29 +99,27 @@ function HealthAssistant() {
           }]);
         }
       } else {
-        setShowInitialForm(true);
+        await setDoc(doc(db, 'users', uid), {
+          createdAt: serverTimestamp(),
+          chatHistory: [{
+            role: 'assistant',
+            content: INITIAL_MESSAGE,
+            timestamp: new Date().toISOString()
+          }]
+        });
+        setMessages([{ 
+          role: 'assistant', 
+          content: INITIAL_MESSAGE,
+          timestamp: new Date().toISOString()
+        }]);
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
-      setError('Error loading profile. Please try again.');
-    }
-  };
-
-  const handleProfileSubmit = async (profileData) => {
-    try {
-      if (userId) {
-        await saveUserProfile(profileData);
-      }
-      setUserProfile(profileData);
-      setShowInitialForm(false);
-      setMessages([{
-        role: 'assistant',
-        content: WELCOME_MESSAGE,
+      setMessages([{ 
+        role: 'assistant', 
+        content: 'Error loading profile. Please try again.',
         timestamp: new Date().toISOString()
       }]);
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      setError('Failed to save profile');
     }
   };
 
@@ -157,6 +178,7 @@ function HealthAssistant() {
 
     const profile = {};
     
+    // Log the message being processed (for debugging)
     console.log('Processing message:', message);
 
     for (const [key, pattern] of Object.entries(patterns)) {
@@ -167,8 +189,9 @@ function HealthAssistant() {
       }
     }
 
+    // Extract goals (everything after "goals:" or numbered list items)
     const goalsMatch = message.match(/goals:\s*(.+?)(?=\n|$)/i) || 
-                    message.match(/6\.\s*(.+?)(?=\n|$)/);
+                      message.match(/6\.\s*(.+?)(?=\n|$)/);
     if (goalsMatch) {
       profile.goals = goalsMatch[1].trim();
       console.log('Matched goals:', profile.goals);
@@ -235,8 +258,16 @@ function HealthAssistant() {
             userId && userProfile ? 
             `User Profile Summary:
               • Demographics: ${userProfile.age} year old ${userProfile.sex}
-              • Physical Stats: Height ${userProfile.height}cm | Weight ${userProfile.weight}kg
+              • Physical Stats: 
+                - Height: ${userProfile.height}cm 
+                - Weight: ${userProfile.weight}kg
+                - BMI: ${(userProfile.weight / Math.pow(userProfile.height / 100, 2)).toFixed(1)}
+                - BMI Category: ${getBMICategory(userProfile.weight / Math.pow(userProfile.height / 100, 2))}
               • Activity Level: ${userProfile.activity}
+              • Daily Caloric Needs:
+                - BMR: ${Math.round(calculateBMR(userProfile))} kcal
+                - Maintenance: ${Math.round(calculateBMR(userProfile) * getActivityMultiplier(userProfile.activity))} kcal
+                - Weight Loss Target: ${Math.round(calculateBMR(userProfile) * getActivityMultiplier(userProfile.activity) - 500)} kcal
               • Personal Goals: ${userProfile.goals}
               Please consider ALL profile elements when providing recommendations.` 
             : 'No profile information available. Provide general health advice and inform user they can save their profile by logging in.'
@@ -279,6 +310,7 @@ function HealthAssistant() {
       
       setMessages(finalMessages);
       
+      // Only save chat history for logged-in users
       if (userId) {
         await saveChatHistory(finalMessages);
       }
@@ -292,7 +324,7 @@ function HealthAssistant() {
     }
   
     setIsLoading(false);
-  };
+};
 
   const renderMessage = (content) => {
     return (
@@ -310,7 +342,6 @@ function HealthAssistant() {
         <InitialProfileForm 
           onSubmit={handleProfileSubmit}
           onCancel={userId ? null : () => setShowInitialForm(false)}
-          initialData={userProfile}  // Pass existing profile data if updating
         />
       </div>
     );
@@ -416,8 +447,8 @@ function HealthAssistant() {
             )}
           </div>
 
-          {/* Input area */}
-          <div className="flex gap-3">
+         {/* Input area */}
+         <div className="flex gap-3">
             <input
               type="text"
               value={inputMessage}
@@ -446,6 +477,24 @@ function HealthAssistant() {
           </div>
         </div>
       </div>
+
+      {/* Notification for profile updates */}
+      {isUpdatingProfile && (
+        <div className="fixed bottom-4 right-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded shadow-lg">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm">
+                Profile update mode active. Please provide your updated information.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
