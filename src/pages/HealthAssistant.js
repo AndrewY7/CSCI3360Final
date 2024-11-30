@@ -10,8 +10,9 @@ import {
   updateDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import ProfileForm from './ProfileForm';
+import InitialProfileForm from '../components/InitialProfileForm';
 
+const WELCOME_MESSAGE = "Thanks for providing your information! How can I help you today?";
 const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today?";
 
 function HealthAssistant() {
@@ -21,8 +22,9 @@ function HealthAssistant() {
   const [userProfile, setUserProfile] = useState(null);
   const [userId, setUserId] = useState(null);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const chatContainerRef = useRef(null);
   const [showInitialForm, setShowInitialForm] = useState(false);
+  const [error, setError] = useState('');
+  const chatContainerRef = useRef(null);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -45,36 +47,12 @@ function HealthAssistant() {
     return () => unsubscribe();
   }, []);
 
-  const handleProfileSubmit = async (profileData) => {
-    try {
-      if (userId) {
-        await saveUserProfile(profileData);
-      }
-      setUserProfile(profileData);
-      setShowInitialForm(false);
-      setMessages([{
-        role: 'assistant',
-        content: WELCOME_MESSAGE,
-        timestamp: new Date().toISOString()
-      }]);
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      setError('Failed to save profile');
-    }
-  };
-
   // Auto-scroll chat
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages]);
-
-  const isProfileComplete = (profile) => {
-    if (!profile) return false;
-    const requiredFields = ['age', 'sex', 'height', 'weight', 'activity', 'goals'];
-    return requiredFields.every(field => profile[field]);
-  };
 
   const loadUserProfile = async (uid) => {
     try {
@@ -93,32 +71,34 @@ function HealthAssistant() {
         } else {
           setMessages([{
             role: 'assistant',
-            content: isProfileComplete(userData.profile) ? WELCOME_BACK_MESSAGE : INITIAL_MESSAGE,
+            content: WELCOME_BACK_MESSAGE,
             timestamp: new Date().toISOString()
           }]);
         }
       } else {
-        await setDoc(doc(db, 'users', uid), {
-          createdAt: serverTimestamp(),
-          chatHistory: [{
-            role: 'assistant',
-            content: INITIAL_MESSAGE,
-            timestamp: new Date().toISOString()
-          }]
-        });
-        setMessages([{ 
-          role: 'assistant', 
-          content: INITIAL_MESSAGE,
-          timestamp: new Date().toISOString()
-        }]);
+        setShowInitialForm(true);
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
-      setMessages([{ 
-        role: 'assistant', 
-        content: 'Error loading profile. Please try again.',
+      setError('Error loading profile. Please try again.');
+    }
+  };
+
+  const handleProfileSubmit = async (profileData) => {
+    try {
+      if (userId) {
+        await saveUserProfile(profileData);
+      }
+      setUserProfile(profileData);
+      setShowInitialForm(false);
+      setMessages([{
+        role: 'assistant',
+        content: WELCOME_MESSAGE,
         timestamp: new Date().toISOString()
       }]);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setError('Failed to save profile');
     }
   };
 
@@ -177,7 +157,6 @@ function HealthAssistant() {
 
     const profile = {};
     
-    // Log the message being processed (for debugging)
     console.log('Processing message:', message);
 
     for (const [key, pattern] of Object.entries(patterns)) {
@@ -188,9 +167,8 @@ function HealthAssistant() {
       }
     }
 
-    // Extract goals (everything after "goals:" or numbered list items)
     const goalsMatch = message.match(/goals:\s*(.+?)(?=\n|$)/i) || 
-                      message.match(/6\.\s*(.+?)(?=\n|$)/);
+                    message.match(/6\.\s*(.+?)(?=\n|$)/);
     if (goalsMatch) {
       profile.goals = goalsMatch[1].trim();
       console.log('Matched goals:', profile.goals);
@@ -244,36 +222,9 @@ function HealthAssistant() {
     try {
       if (userId) {
         if (inputMessage.toLowerCase().includes('update profile')) {
-          setIsUpdatingProfile(true);
-          const updateMessage = {
-            role: 'assistant',
-            content: INITIAL_MESSAGE,
-            timestamp: new Date().toISOString()
-          };
-          const finalMessages = [...updatedMessages, updateMessage];
-          setMessages(finalMessages);
-          await saveChatHistory(finalMessages);
+          setShowInitialForm(true);
           setIsLoading(false);
           return;
-        }
-  
-        if (isUpdatingProfile || !userProfile) {
-          const profile = processUserProfile(inputMessage);
-          if (profile) {
-            await saveUserProfile(profile);
-            setUserProfile(profile);
-            setIsUpdatingProfile(false);
-            const confirmMessage = {
-              role: 'assistant',
-              content: "Profile updated successfully! How may I help you today?",
-              timestamp: new Date().toISOString()
-            };
-            const finalMessages = [...updatedMessages, confirmMessage];
-            setMessages(finalMessages);
-            await saveChatHistory(finalMessages);
-            setIsLoading(false);
-            return;
-          }
         }
       }
   
@@ -328,7 +279,6 @@ function HealthAssistant() {
       
       setMessages(finalMessages);
       
-      // Only save chat history for logged-in users
       if (userId) {
         await saveChatHistory(finalMessages);
       }
@@ -360,6 +310,7 @@ function HealthAssistant() {
         <InitialProfileForm 
           onSubmit={handleProfileSubmit}
           onCancel={userId ? null : () => setShowInitialForm(false)}
+          initialData={userProfile}  // Pass existing profile data if updating
         />
       </div>
     );
@@ -392,7 +343,7 @@ function HealthAssistant() {
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold mb-2">Your Profile</h2>
             <button
-              onClick={() => setIsUpdatingProfile(true)}
+              onClick={() => setShowInitialForm(true)}
               className="text-sm text-blue-500 hover:text-blue-700"
             >
               Update Profile
@@ -465,8 +416,8 @@ function HealthAssistant() {
             )}
           </div>
 
-         {/* Input area */}
-         <div className="flex gap-3">
+          {/* Input area */}
+          <div className="flex gap-3">
             <input
               type="text"
               value={inputMessage}
@@ -495,24 +446,6 @@ function HealthAssistant() {
           </div>
         </div>
       </div>
-
-      {/* Notification for profile updates */}
-      {isUpdatingProfile && (
-        <div className="fixed bottom-4 right-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded shadow-lg">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm">
-                Profile update mode active. Please provide your updated information.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
