@@ -133,38 +133,36 @@ function Profile() {
       const currentDoc = await getDoc(userDocRef);
       const currentData = currentDoc.exists() ? currentDoc.data() : {};
   
+      // Calculate BMI
       const newBMI = (editableProfile.weight / Math.pow(editableProfile.height / 100, 2)).toFixed(1);
       
+      // Create new history entry with timestamp
       const historyEntry = {
         weight: parseFloat(editableProfile.weight),
         bmi: parseFloat(newBMI),
         date: new Date().toISOString(),
       };
   
-      const now = new Date();
-  
+      // Get existing history or create new array
+      const existingHistory = currentData.metricsHistory || [];
+      
       const updatedProfile = {
         ...currentData,
         profile: {
           ...currentData.profile,
           ...editableProfile,
-          updatedAt: now.toISOString() 
+          updatedAt: serverTimestamp()
         },
-        metricsHistory: [...(currentData.metricsHistory || []), historyEntry]
+        // Add new entry to metrics history
+        metricsHistory: [...existingHistory, historyEntry].sort((a, b) => 
+          new Date(a.date) - new Date(b.date)
+        )
       };
   
-      await setDoc(userDocRef, {
-        ...updatedProfile,
-        profile: {
-          ...updatedProfile.profile,
-          updatedAt: serverTimestamp() 
-        }
-      });
-  
+      await setDoc(userDocRef, updatedProfile);
       setUserProfile(updatedProfile);
       setIsEditing(false);
       setError('');
-  
     } catch (error) {
       console.error('Error updating profile:', error);
       setError('Failed to update profile');
@@ -216,6 +214,17 @@ function Profile() {
       athlete: 1.9
     };
     return multipliers[activity.toLowerCase()] || 1.2;
+  };
+
+  const formatChartData = (history) => {
+    if (!history) return [];
+    
+    return history.map(entry => ({
+      ...entry,
+      date: new Date(entry.date).toLocaleDateString(),
+      weight: parseFloat(entry.weight),
+      bmi: parseFloat(entry.bmi)
+    }));
   };
 
   if (isLoading) {
@@ -551,7 +560,7 @@ function Profile() {
           )}
 
           {/* Progress Chart */}
-          {userProfile?.metricsHistory ? (
+          {userProfile?.metricsHistory && userProfile.metricsHistory.length > 0 ? (
             <div className="mt-6 bg-white p-4 rounded-lg shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-medium text-blue-800">Progress Tracking</h3>
@@ -595,21 +604,34 @@ function Profile() {
               <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={getFilteredData(userProfile.metricsHistory)}
+                    data={formatChartData(getFilteredData(userProfile.metricsHistory))}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="date"
-                      tickFormatter={(date) => new Date(date).toLocaleDateString()}
+                      type="category"
+                      allowDuplicatedCategory={false}
                     />
-                    <YAxis yAxisId="weight" orientation="left" stroke="#2563eb" domain={['auto', 'auto']} />
-                    <YAxis yAxisId="bmi" orientation="right" stroke="#dc2626" domain={[15, 35]} />
+                    <YAxis 
+                      yAxisId="weight" 
+                      orientation="left" 
+                      stroke="#2563eb"
+                      domain={['auto', 'auto']}
+                      label={{ value: 'Weight (kg)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <YAxis 
+                      yAxisId="bmi" 
+                      orientation="right" 
+                      stroke="#dc2626"
+                      domain={[15, 35]}
+                      label={{ value: 'BMI', angle: 90, position: 'insideRight' }}
+                    />
                     <Tooltip
-                      labelFormatter={(date) => new Date(date).toLocaleDateString()}
+                      labelFormatter={(value) => `Date: ${value}`}
                       formatter={(value, name) => [value.toFixed(1), name]}
                     />
-                    <Legend />
+                    <Legend verticalAlign="top" height={36}/>
                     {selectedMetrics.weight && (
                       <Line
                         yAxisId="weight"
