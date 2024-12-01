@@ -473,11 +473,11 @@ function HealthAssistant() {
               <span className="font-medium">Sex:</span> {userProfile.sex}
             </div>
             <div>
-              <span className="font-medium">Height:</span> 
+              <span className="font-medium">Height: </span> 
               {convertToDisplayUnits(userProfile.height, 'height', unitPreference === 'imperial')}
             </div>
             <div>
-              <span className="font-medium">Weight:</span> 
+              <span className="font-medium">Weight: </span> 
               {convertToDisplayUnits(userProfile.weight, 'weight', unitPreference === 'imperial')}
             </div>
             <div>
