@@ -363,6 +363,27 @@ function HealthAssistant() {
     );
   };
 
+  const clearMessages = async () => {
+    try {
+      if (userId) {
+        // Clear messages in Firestore
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, {
+          chatHistory: []
+        });
+      }
+      // Clear messages in state
+      setMessages([{
+        role: 'assistant',
+        content: WELCOME_BACK_MESSAGE,
+        timestamp: new Date().toISOString()
+      }]);
+    } catch (error) {
+      console.error('Error clearing messages:', error);
+      setError('Failed to clear messages');
+    }
+  };
+
   if (showInitialForm) {
     return (
       <div className="w-[85%] mx-auto px-4 py-8">
@@ -395,7 +416,6 @@ function HealthAssistant() {
         </div>
       )}
       
-      {/* User Profile Display */}
       {userProfile && (
         <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
           <div className="flex justify-between items-center">
@@ -433,49 +453,81 @@ function HealthAssistant() {
       
       <div className="w-full mx-auto bg-gray-100 rounded-lg shadow-lg">
         <div className="p-8">
-          {/* Chat container */}
-          <div 
-            ref={chatContainerRef}
-            className="bg-white rounded-lg p-6 h-[600px] overflow-y-auto mb-6 shadow-inner"
-          >
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-              >
-                <div className="flex items-start max-w-[80%]">
-                  {message.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded-full bg-gray-200 mr-2 flex-shrink-0" />
-                  )}
-                  <div
-                    className={`rounded-lg p-3 ${
-                      message.role === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-200'
-                    }`}
+          <div className="bg-white rounded-lg p-6 shadow-inner">
+            {/* Clear messages button */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-700">Chat History</h3>
+              {messages.length > 1 && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to clear all messages?')) {
+                      clearMessages();
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-1 text-red-500 hover:bg-red-50 rounded-md transition-colors duration-200"
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    className="h-4 w-4" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
                   >
-                    {renderMessage(message.content)}
-                  </div>
-                  {message.role === 'user' && (
-                    <div className="w-8 h-8 rounded-full bg-gray-200 ml-2 flex-shrink-0" />
-                  )}
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start mb-4">
-                <div className="flex items-center bg-gray-200 rounded-lg p-3">
-                  <svg className="animate-spin h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                    />
                   </svg>
+                  Clear Chat
+                </button>
+              )}
+            </div>
+
+            {/* Messages container */}
+            <div 
+              ref={chatContainerRef}
+              className="h-[600px] overflow-y-auto"
+            >
+              {messages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+                >
+                  <div className="flex items-start max-w-[80%]">
+                    {message.role === 'assistant' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 mr-2 flex-shrink-0" />
+                    )}
+                    <div
+                      className={`rounded-lg p-3 ${
+                        message.role === 'user'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200'
+                      }`}
+                    >
+                      {renderMessage(message.content)}
+                    </div>
+                    {message.role === 'user' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 ml-2 flex-shrink-0" />
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
+              {isLoading && (
+                <div className="flex justify-start mb-4">
+                  <div className="flex items-center bg-gray-200 rounded-lg p-3">
+                    <svg className="animate-spin h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-         {/* Input area */}
-         <div className="flex gap-3">
+          <div className="flex gap-3 mt-6">
             <input
               type="text"
               value={inputMessage}
@@ -505,7 +557,6 @@ function HealthAssistant() {
         </div>
       </div>
 
-      {/* Notification for profile updates */}
       {isUpdatingProfile && (
         <div className="fixed bottom-4 right-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded shadow-lg">
           <div className="flex">
