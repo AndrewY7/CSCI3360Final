@@ -27,6 +27,32 @@ function HealthAssistant() {
   const [error, setError] = useState('');
   const [unitPreference, setUnitPreference] = useState('metric');
 
+  const convertToDisplayUnits = (value, measurement, toImperial = false) => {
+    if (!value) return '';
+    
+    switch (measurement) {
+      case 'height':
+        if (toImperial) {
+          const totalInches = value / 2.54;
+          const feet = Math.floor(totalInches / 12);
+          const inches = Math.round(totalInches % 12);
+          return `${feet}'${inches}"`;
+        }
+        return `${value} cm`;
+      case 'weight':
+        if (toImperial) {
+          return `${Math.round(value * 2.20462)} lbs`;
+        }
+        return `${value} kg`;
+      default:
+        return value;
+    }
+  };
+  
+  const getBMI = (weight, height) => {
+    return (weight / Math.pow(height / 100, 2)).toFixed(1);
+  };
+
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
