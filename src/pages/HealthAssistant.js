@@ -77,9 +77,41 @@ function HealthAssistant() {
   const handleProfileSubmit = async (profileData) => {
     try {
       if (userId) {
-        await saveUserProfile(profileData);
+        // Calculate BMI
+        const newBMI = (profileData.weight / Math.pow(profileData.height / 100, 2)).toFixed(1);
+        
+        // Create new history entry
+        const historyEntry = {
+          weight: parseFloat(profileData.weight),
+          bmi: parseFloat(newBMI),
+          date: new Date().toISOString(),
+        };
+  
+        // Get current user data to access existing history
+        const userDocRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userDocRef);
+        const currentData = userDoc.exists() ? userDoc.data() : {};
+        const existingHistory = currentData.metricsHistory || [];
+  
+        // Create updated profile with new history entry
+        const updatedProfile = {
+          ...currentData,
+          profile: {
+            ...profileData,
+            updatedAt: new Date().toISOString()
+          },
+          metricsHistory: [...existingHistory, historyEntry].sort((a, b) => 
+            new Date(a.date) - new Date(b.date)
+          )
+        };
+  
+        // Save to Firestore
+        await setDoc(userDocRef, updatedProfile, { merge: true });
+        setUserProfile(updatedProfile);
+      } else {
+        setUserProfile(profileData);
       }
-      setUserProfile(profileData);
+      
       setShowInitialForm(false);
       setMessages([{
         role: 'assistant',
@@ -184,15 +216,30 @@ function HealthAssistant() {
       const userDoc = await getDoc(userDocRef);
       const existingData = userDoc.exists() ? userDoc.data() : {};
       
+      // Calculate BMI
+      const newBMI = (profile.weight / Math.pow(profile.height / 100, 2)).toFixed(1);
+      
+      // Create new history entry
+      const historyEntry = {
+        weight: parseFloat(profile.weight),
+        bmi: parseFloat(newBMI),
+        date: new Date().toISOString(),
+      };
+  
+      const existingHistory = existingData.metricsHistory || [];
+      
       const updatedProfile = {
         ...existingData,
         profile: {
           ...(existingData.profile || {}),
           ...profile,
           updatedAt: new Date().toISOString()
-        }
+        },
+        metricsHistory: [...existingHistory, historyEntry].sort((a, b) => 
+          new Date(a.date) - new Date(b.date)
+        )
       };
-
+  
       await setDoc(userDocRef, updatedProfile, { merge: true });
       return updatedProfile;
     } catch (error) {
