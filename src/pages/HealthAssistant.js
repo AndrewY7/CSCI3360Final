@@ -25,6 +25,7 @@ function HealthAssistant() {
   const chatContainerRef = useRef(null);
   const [showInitialForm, setShowInitialForm] = useState(false);
   const [error, setError] = useState('');
+  const [unitPreference, setUnitPreference] = useState('metric');
 
   // Listen for auth state changes
   useEffect(() => {
@@ -390,6 +391,9 @@ function HealthAssistant() {
         <ProfileForm 
           onSubmit={handleProfileSubmit}
           onCancel={userId ? null : () => setShowInitialForm(false)}
+          initialData={userProfile}
+          unitPreference={unitPreference}
+          onUnitPreferenceChange={setUnitPreference}
         />
       </div>
     );
@@ -420,12 +424,20 @@ function HealthAssistant() {
         <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold mb-2">Your Profile</h2>
-            <button
-              onClick={() => setShowInitialForm(true)}
-              className="text-sm text-blue-500 hover:text-blue-700"
-            >
-              Update Profile
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setUnitPreference(prev => prev === 'metric' ? 'imperial' : 'metric')}
+                className="text-sm px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                {unitPreference === 'metric' ? 'Switch to Imperial' : 'Switch to Metric'}
+              </button>
+              <button
+                onClick={() => setShowInitialForm(true)}
+                className="text-sm text-blue-500 hover:text-blue-700"
+              >
+                Update Profile
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
@@ -435,10 +447,12 @@ function HealthAssistant() {
               <span className="font-medium">Sex:</span> {userProfile.sex}
             </div>
             <div>
-              <span className="font-medium">Height:</span> {userProfile.height}cm
+              <span className="font-medium">Height:</span> 
+              {convertToDisplayUnits(userProfile.height, 'height', unitPreference === 'imperial')}
             </div>
             <div>
-              <span className="font-medium">Weight:</span> {userProfile.weight}kg
+              <span className="font-medium">Weight:</span> 
+              {convertToDisplayUnits(userProfile.weight, 'weight', unitPreference === 'imperial')}
             </div>
             <div>
               <span className="font-medium">Activity Level:</span> {userProfile.activity}

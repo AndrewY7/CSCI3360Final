@@ -35,6 +35,7 @@ function Profile() {
     bmi: true
   });
   const [timeRange, setTimeRange] = useState('all');
+  const [unitPreference, setUnitPreference] = useState('metric');
 
   useEffect(() => {
     console.log('Current Firebase Config:', {
@@ -439,11 +440,21 @@ function Profile() {
         <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Profile Information</h2>
-            <span className="text-sm text-gray-500">
-              {userProfile.profile.updatedAt ? 
-                `Last updated: ${new Date(userProfile.profile.updatedAt).toLocaleDateString()}` 
-                : ''}
-            </span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setUnitPreference(prev => prev === 'metric' ? 'imperial' : 'metric')}
+                  className="text-sm px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  {unitPreference === 'metric' ? 'Switch to Imperial' : 'Switch to Metric'}
+                </button>
+              </div>
+              <span className="text-sm text-gray-500">
+                {userProfile.profile.updatedAt ? 
+                  `Last updated: ${new Date(userProfile.profile.updatedAt).toLocaleDateString()}` 
+                  : ''}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -483,20 +494,24 @@ function Profile() {
                 {userProfile.profile.height && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Height:</span>
-                    <span className="font-medium">{userProfile.profile.height} cm</span>
+                    <span className="font-medium">
+                      {convertToDisplayUnits(userProfile.profile.height, 'height', unitPreference === 'imperial')}
+                    </span>
                   </div>
                 )}
                 {userProfile.profile.weight && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Weight:</span>
-                    <span className="font-medium">{userProfile.profile.weight} kg</span>
+                    <span className="font-medium">
+                      {convertToDisplayUnits(userProfile.profile.weight, 'weight', unitPreference === 'imperial')}
+                    </span>
                   </div>
                 )}
                 {userProfile.profile.height && userProfile.profile.weight && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">BMI:</span>
                     <span className="font-medium">
-                      {(userProfile.profile.weight / Math.pow(userProfile.profile.height / 100, 2)).toFixed(1)}
+                      {getBMI(userProfile.profile.weight, userProfile.profile.height)}
                     </span>
                   </div>
                 )}
