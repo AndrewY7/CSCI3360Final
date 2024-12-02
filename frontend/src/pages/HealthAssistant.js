@@ -387,7 +387,7 @@ function HealthAssistant() {
           5. Safety Notice
           6. Progress Tracking
           
-          Keep responses concise but complete. Do not truncate or split responses. This means being able to provide a full response to each part of the message as structured above.
+          Keep responses concise but complete. Do not truncate or split responses. This means that each part of the structured response should show up in the chat to be sent out.
           Remove all ### headers from the response as well as ** emphasis from the response.`
         },
         ...updatedMessages
