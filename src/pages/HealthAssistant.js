@@ -359,16 +359,8 @@ function HealthAssistant() {
             userId && userProfile ? 
             `User Profile Summary:
               • Demographics: ${userProfile.age} year old ${userProfile.sex}
-              • Physical Stats: 
-                - Height: ${userProfile.height}cm 
-                - Weight: ${userProfile.weight}kg
-                - BMI: ${(userProfile.weight / Math.pow(userProfile.height / 100, 2)).toFixed(1)}
-                - BMI Category: ${getBMICategory(userProfile.weight / Math.pow(userProfile.height / 100, 2))}
+              • Physical Stats: Height ${userProfile.height}cm | Weight ${userProfile.weight}kg
               • Activity Level: ${userProfile.activity}
-              • Daily Caloric Needs:
-                - BMR: ${Math.round(calculateBMR(userProfile))} kcal
-                - Maintenance: ${Math.round(calculateBMR(userProfile) * getActivityMultiplier(userProfile.activity))} kcal
-                - Weight Loss Target: ${Math.round(calculateBMR(userProfile) * getActivityMultiplier(userProfile.activity) - 500)} kcal
               • Personal Goals: ${userProfile.goals}
               Please consider ALL profile elements when providing recommendations.` 
             : 'No profile information available. Provide general health advice and inform user they can save their profile by logging in.'
@@ -397,7 +389,26 @@ function HealthAssistant() {
           5. Safety Notice: Relevant disclaimers
           6. Progress Tracking: Measurable metrics for success
           
-          Always maintain a professional yet friendly tone.`
+          Always maintain a professional yet friendly tone.
+          
+          When providing structured advice or plans:
+          - Do not use asterisks (**) for emphasis
+          - Do not use hashtags (###) for headers
+          - Instead, use plain text formatting with appropriate capitalization and line breaks to structure the information clearly.
+          - Use numbers and bullet points (•) for lists
+          - Use clear section titles in CAPS followed by a colon, like "SECTION TITLE:"
+          
+          Example format:
+          TITLE:
+          Main point here
+          
+          SECTION 1:
+          • Point 1
+          • Point 2
+          
+          SECTION 2:
+          1. First item
+          2. Second item`
         },
         ...updatedMessages
       ];
