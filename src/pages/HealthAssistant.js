@@ -386,10 +386,8 @@ function HealthAssistant() {
           5. Safety Notice
           6. Progress Tracking
           
-          Keep responses concise but complete. Do not truncate or split responses.
-          Remove all ### headers from the response as well as ** emphasis from the response.
-          
-          Complete the entire response before sending. This includes all structure as indicated above.`
+          Keep responses concise but complete. Do not truncate or split responses. This means that each part of the structured response should show up in the chat to be sent out.
+          Remove all ### headers from the response as well as ** emphasis from the response.`
         },
         ...updatedMessages
       ];
