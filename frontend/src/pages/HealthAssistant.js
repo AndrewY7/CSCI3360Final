@@ -396,8 +396,7 @@ function HealthAssistant() {
           - Do not use asterisks (**) for emphasis
           - Do not use hashtags (###) for headers
           - Instead, use plain text formatting with appropriate capitalization and line breaks to structure the information clearly.
-          - Use numbers and bullet points (•) for lists
-          - Use clear section titles in CAPS followed by a colon, like "SECTION TITLE:"`
+          - Use numbers and bullet points (•) for lists`
         },
         ...updatedMessages
       ];
