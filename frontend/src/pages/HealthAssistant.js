@@ -205,7 +205,14 @@ function HealthAssistant() {
       }
   
       const data = await response.json();
-      return data.message;
+      
+      // Split long messages at natural break points
+      if (data.message.length > 2000) {
+        const sections = data.message.split(/(?=###)/);
+        return sections.filter(section => section.trim());
+      }
+      
+      return [data.message];
     } catch (error) {
       console.error('Error calling OpenAI:', error);
       throw error;
@@ -310,11 +317,16 @@ function HealthAssistant() {
       ];
   
       const response = await callOpenAI(messageHistory);
-      const finalMessages = [...updatedMessages, { 
-        role: 'assistant', 
-        content: response,
-        timestamp: new Date().toISOString()
-      }];
+      
+      // Handle multiple message sections
+      const finalMessages = [
+        ...updatedMessages,
+        ...response.map(content => ({ 
+          role: 'assistant', 
+          content,
+          timestamp: new Date().toISOString()
+        }))
+      ];
       
       setMessages(finalMessages);
       
