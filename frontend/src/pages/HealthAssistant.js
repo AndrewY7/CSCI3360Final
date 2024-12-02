@@ -288,7 +288,12 @@ function HealthAssistant() {
           6. For mental health questions, provide general guidance and recommend professional help when appropriate
           7. ${userId ? 'If user asks to update profile, guide them through the update process' : 'If user asks about profile features, inform them they need to log in'}
           
-          Always maintain a professional yet friendly tone.`
+          Always maintain a professional yet friendly tone.
+          
+          When providing structured advice or plans:
+          - Do not use asterisks (**) for emphasis
+          - Do not use hashtags (###) for headers
+          - Instead, use plain text formatting with appropriate capitalization and line breaks to structure the information clearly.`
         },
         ...updatedMessages
       ];
