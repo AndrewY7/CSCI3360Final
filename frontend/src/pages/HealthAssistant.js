@@ -375,42 +375,35 @@ function HealthAssistant() {
           5. Be encouraging and supportive
           6. For mental health questions, provide general guidance and recommend professional help when appropriate
           7. ${userId ? 'If user asks to update profile, guide them through the update process' : 'If user asks about profile features, inform them they need to log in'}
-          8. ALWAYS include relevant health disclaimers:
-             - General advice: "This advice is general in nature and may not suit everyone."
-             - Medical concerns: "Please consult healthcare provider for medical advice."
-             - Mental health: "For mental health support, contact qualified mental health professional."
-          9. Flag emergency situations immediately and provide emergency contact guidance.
+          8. ALWAYS include relevant health disclaimers
+          9. Flag emergency situations immediately
           10. Verify calculations twice before including numerical recommendations.
 
           When providing recommendations, always structure your response as follows:
-          1. Profile-Based Context: Reference specific user details
-          2. Personalized Recommendation: Tailored to profile and goals
-          3. Scientific Basis: Brief evidence-based explanation
-          4. Practical Implementation: Step-by-step guidance
-          5. Safety Notice: Relevant disclaimers
-          6. Progress Tracking: Measurable metrics for success
+          1. Profile-Based Context
+          2. Personalized Recommendation
+          3. Scientific Basis
+          4. Practical Implementation
+          5. Safety Notice
+          6. Progress Tracking
           
-          Always maintain a professional yet friendly tone.
-          
-          When providing structured advice or plans:
-          - Do not use asterisks (**) for emphasis
-          - Do not use hashtags (###) for headers
-          - Instead, use plain text formatting with appropriate capitalization and line breaks to structure the information clearly.
-          - Use numbers and bullet points (•) for lists`
+          Keep responses concise but complete. Do not truncate or split responses.`
         },
         ...updatedMessages
       ];
   
       const response = await callOpenAI(messageHistory);
+      // Extract the full response content
+      const assistantResponse = response[0];
+      
       const finalMessages = [...updatedMessages, { 
         role: 'assistant', 
-        content: response,
+        content: assistantResponse,
         timestamp: new Date().toISOString()
       }];
       
       setMessages(finalMessages);
       
-      // Only save chat history for logged-in users
       if (userId) {
         await saveChatHistory(finalMessages);
       }
