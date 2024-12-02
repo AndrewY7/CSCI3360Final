@@ -323,12 +323,6 @@ function HealthAssistant() {
   
       const data = await response.json();
       
-      // Split long messages at natural break points
-      if (data.message.length > 2000) {
-        const sections = data.message.split(/(?=###)/);
-        return sections.filter(section => section.trim());
-      }
-      
       return [data.message];
     } catch (error) {
       console.error('Error calling OpenAI:', error);
@@ -403,19 +397,7 @@ function HealthAssistant() {
           - Do not use hashtags (###) for headers
           - Instead, use plain text formatting with appropriate capitalization and line breaks to structure the information clearly.
           - Use numbers and bullet points (•) for lists
-          - Use clear section titles in CAPS followed by a colon, like "SECTION TITLE:"
-          
-          Example format:
-          TITLE:
-          Main point here
-          
-          SECTION 1:
-          • Point 1
-          • Point 2
-          
-          SECTION 2:
-          1. First item
-          2. Second item`
+          - Use clear section titles in CAPS followed by a colon, like "SECTION TITLE:"`
         },
         ...updatedMessages
       ];
