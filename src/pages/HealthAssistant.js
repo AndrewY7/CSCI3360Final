@@ -595,7 +595,17 @@ function HealthAssistant() {
                 >
                   <div className="flex items-start max-w-[80%]">
                     {message.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-full bg-gray-200 mr-2 flex-shrink-0" />
+                      <div className="w-8 h-8 rounded-full overflow-hidden mr-2 flex-shrink-0">
+                        <img 
+                          src="./pictures/aiassistant.jpg"  
+                          alt="Health Assistant"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234B5563'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-11h-2v3H8v2h3v3h2v-3h3v-2h-3V9z'/%3E%3C/svg%3E";
+                          }}
+                        />
+                      </div>
                     )}
                     <div
                       className={`rounded-lg p-3 ${
@@ -607,7 +617,30 @@ function HealthAssistant() {
                       {renderMessage(message.content)}
                     </div>
                     {message.role === 'user' && (
-                      <div className="w-8 h-8 rounded-full bg-gray-200 ml-2 flex-shrink-0" />
+                      <div className="w-8 h-8 rounded-full overflow-hidden ml-2 flex-shrink-0">
+                      {userProfile?.profile?.photoURL ? (
+                        <img 
+                          src= './pictures/user.jpg'
+                          alt="User"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234B5563'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/%3E%3C/svg%3E";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                          <svg 
+                            className="w-5 h-5 text-gray-500" 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                          >
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                     )}
                   </div>
                 </div>
