@@ -206,12 +206,6 @@ function HealthAssistant() {
   
       const data = await response.json();
       
-      // Split long messages at natural break points
-      if (data.message.length > 2000) {
-        const sections = data.message.split(/(?=###)/);
-        return sections.filter(section => section.trim());
-      }
-      
       return [data.message];
     } catch (error) {
       console.error('Error calling OpenAI:', error);
