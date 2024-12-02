@@ -10,18 +10,10 @@ import {
   updateDoc,
   serverTimestamp 
 } from 'firebase/firestore';
+import ProfileForm from './ProfileForm';
 
-const INITIAL_MESSAGE = `Hi! I'm your personal health assistant. To help you better, I'd like to know a few things about you:
-1. Your age
-2. Your sex (male/female)
-3. Your height (in cm)
-4. Your weight (in kg)
-5. Your physical activity level (sedentary/light/moderate/heavy/athlete)
-6. Your health goals
-
-Please provide these details so I can give you personalized advice.`;
-
-const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today? If you need to update your profile information, just say 'update profile' and I'll help you with that.";
+const WELCOME_MESSAGE = "Thanks for providing your information! How can I help you today?";
+const WELCOME_BACK_MESSAGE = "Welcome back! How may I help you today?";
 
 function HealthAssistant() {
   const [messages, setMessages] = useState([]);
@@ -31,22 +23,106 @@ function HealthAssistant() {
   const [userId, setUserId] = useState(null);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const chatContainerRef = useRef(null);
+  const [showInitialForm, setShowInitialForm] = useState(false);
+  const [error, setError] = useState('');
+  const [unitPreference, setUnitPreference] = useState('metric');
+
+  const convertToDisplayUnits = (value, measurement, toImperial = false) => {
+    if (!value) return '';
+    
+    switch (measurement) {
+      case 'height':
+        if (toImperial) {
+          const totalInches = value / 2.54;
+          const feet = Math.floor(totalInches / 12);
+          const inches = Math.round(totalInches % 12);
+          return `${feet}'${inches}"`;
+        }
+        return `${value} cm`;
+      case 'weight':
+        if (toImperial) {
+          return `${Math.round(value * 2.20462)} lbs`;
+        }
+        return `${value} kg`;
+      default:
+        return value;
+    }
+  };
+  
+  const getBMI = (weight, height) => {
+    return (weight / Math.pow(height / 100, 2)).toFixed(1);
+  };
 
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserId(user.uid);
-        await loadUserProfile(user.uid);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists() || !userDoc.data().profile) {
+          setShowInitialForm(true);
+        } else {
+          await loadUserProfile(user.uid);
+        }
       } else {
         setUserId(null);
         setUserProfile(null);
-        setMessages([{ role: 'assistant', content: INITIAL_MESSAGE }]);
+        setShowInitialForm(true);
       }
     });
 
     return () => unsubscribe();
   }, []);
+
+  const handleProfileSubmit = async (profileData) => {
+    try {
+      if (userId) {
+        // Calculate BMI
+        const newBMI = (profileData.weight / Math.pow(profileData.height / 100, 2)).toFixed(1);
+        
+        // Create new history entry
+        const historyEntry = {
+          weight: parseFloat(profileData.weight),
+          bmi: parseFloat(newBMI),
+          date: new Date().toISOString(),
+        };
+  
+        // Get current user data to access existing history
+        const userDocRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userDocRef);
+        const currentData = userDoc.exists() ? userDoc.data() : {};
+        const existingHistory = currentData.metricsHistory || [];
+  
+        // Create updated profile with new history entry
+        const updatedProfile = {
+          ...currentData,
+          profile: {
+            ...profileData,
+            updatedAt: new Date().toISOString()
+          },
+          metricsHistory: [...existingHistory, historyEntry].sort((a, b) => 
+            new Date(a.date) - new Date(b.date)
+          )
+        };
+  
+        // Save to Firestore
+        await setDoc(userDocRef, updatedProfile, { merge: true });
+        setUserProfile(updatedProfile);
+      } else {
+        setUserProfile(profileData);
+      }
+      
+      setShowInitialForm(false);
+      setMessages([{
+        role: 'assistant',
+        content: WELCOME_MESSAGE,
+        timestamp: new Date().toISOString()
+      }]);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setError('Failed to save profile');
+    }
+  };
 
   // Auto-scroll chat
   useEffect(() => {
@@ -55,10 +131,36 @@ function HealthAssistant() {
     }
   }, [messages]);
 
-  const isProfileComplete = (profile) => {
-    if (!profile) return false;
-    const requiredFields = ['age', 'sex', 'height', 'weight', 'activity', 'goals'];
-    return requiredFields.every(field => profile[field]);
+  const calculateBMR = (profile) => {
+    if (!profile?.sex || !profile?.weight || !profile?.height || !profile?.age) return null;
+    
+    const weight = parseFloat(profile.weight);
+    const height = parseFloat(profile.height);
+    const age = parseFloat(profile.age);
+    
+    if (isNaN(weight) || isNaN(height) || isNaN(age)) return null;
+  
+    return profile.sex.toLowerCase() === 'male'
+      ? 10 * weight + 6.25 * height - 5 * age + 5
+      : 10 * weight + 6.25 * height - 5 * age - 161;
+  };
+  
+  const getActivityMultiplier = (activity) => {
+    const multipliers = {
+      sedentary: 1.2,
+      light: 1.375,
+      moderate: 1.55,
+      heavy: 1.725,
+      athlete: 1.9
+    };
+    return multipliers[activity.toLowerCase()] || 1.2;
+  };
+  
+  const getBMICategory = (bmi) => {
+    if (bmi < 18.5) return 'Underweight';
+    if (bmi < 25) return 'Normal weight';
+    if (bmi < 30) return 'Overweight';
+    return 'Obese';
   };
 
   const loadUserProfile = async (uid) => {
@@ -78,7 +180,7 @@ function HealthAssistant() {
         } else {
           setMessages([{
             role: 'assistant',
-            content: isProfileComplete(userData.profile) ? WELCOME_BACK_MESSAGE : INITIAL_MESSAGE,
+            content: WELCOME_BACK_MESSAGE,
             timestamp: new Date().toISOString()
           }]);
         }
@@ -87,13 +189,13 @@ function HealthAssistant() {
           createdAt: serverTimestamp(),
           chatHistory: [{
             role: 'assistant',
-            content: INITIAL_MESSAGE,
+            content: WELCOME_BACK_MESSAGE,
             timestamp: new Date().toISOString()
           }]
         });
         setMessages([{ 
           role: 'assistant', 
-          content: INITIAL_MESSAGE,
+          content: WELCOME_BACK_MESSAGE,
           timestamp: new Date().toISOString()
         }]);
       }
@@ -114,15 +216,30 @@ function HealthAssistant() {
       const userDoc = await getDoc(userDocRef);
       const existingData = userDoc.exists() ? userDoc.data() : {};
       
+      // Calculate BMI
+      const newBMI = (profile.weight / Math.pow(profile.height / 100, 2)).toFixed(1);
+      
+      // Create new history entry
+      const historyEntry = {
+        weight: parseFloat(profile.weight),
+        bmi: parseFloat(newBMI),
+        date: new Date().toISOString(),
+      };
+  
+      const existingHistory = existingData.metricsHistory || [];
+      
       const updatedProfile = {
         ...existingData,
         profile: {
           ...(existingData.profile || {}),
           ...profile,
           updatedAt: new Date().toISOString()
-        }
+        },
+        metricsHistory: [...existingHistory, historyEntry].sort((a, b) => 
+          new Date(a.date) - new Date(b.date)
+        )
       };
-
+  
       await setDoc(userDocRef, updatedProfile, { merge: true });
       return updatedProfile;
     } catch (error) {
@@ -205,14 +322,7 @@ function HealthAssistant() {
       }
   
       const data = await response.json();
-      
-      // Split long messages at natural break points
-      if (data.message.length > 2000) {
-        const sections = data.message.split(/(?=###)/);
-        return sections.filter(section => section.trim());
-      }
-      
-      return [data.message];
+      return data.message;
     } catch (error) {
       console.error('Error calling OpenAI:', error);
       throw error;
@@ -236,36 +346,9 @@ function HealthAssistant() {
     try {
       if (userId) {
         if (inputMessage.toLowerCase().includes('update profile')) {
-          setIsUpdatingProfile(true);
-          const updateMessage = {
-            role: 'assistant',
-            content: INITIAL_MESSAGE,
-            timestamp: new Date().toISOString()
-          };
-          const finalMessages = [...updatedMessages, updateMessage];
-          setMessages(finalMessages);
-          await saveChatHistory(finalMessages);
+          setShowInitialForm(true);
           setIsLoading(false);
           return;
-        }
-  
-        if (isUpdatingProfile || !userProfile) {
-          const profile = processUserProfile(inputMessage);
-          if (profile) {
-            await saveUserProfile(profile);
-            setUserProfile(profile);
-            setIsUpdatingProfile(false);
-            const confirmMessage = {
-              role: 'assistant',
-              content: "Profile updated successfully! How may I help you today?",
-              timestamp: new Date().toISOString()
-            };
-            const finalMessages = [...updatedMessages, confirmMessage];
-            setMessages(finalMessages);
-            await saveChatHistory(finalMessages);
-            setIsLoading(false);
-            return;
-          }
         }
       }
   
@@ -331,16 +414,11 @@ function HealthAssistant() {
       ];
   
       const response = await callOpenAI(messageHistory);
-      
-      // Handle multiple message sections
-      const finalMessages = [
-        ...updatedMessages,
-        ...response.map(content => ({ 
-          role: 'assistant', 
-          content,
-          timestamp: new Date().toISOString()
-        }))
-      ];
+      const finalMessages = [...updatedMessages, { 
+        role: 'assistant', 
+        content: response,
+        timestamp: new Date().toISOString()
+      }];
       
       setMessages(finalMessages);
       
@@ -358,7 +436,7 @@ function HealthAssistant() {
     }
   
     setIsLoading(false);
-  };
+};
 
   const renderMessage = (content) => {
     return (
@@ -369,6 +447,41 @@ function HealthAssistant() {
       </div>
     );
   };
+
+  const clearMessages = async () => {
+    try {
+      if (userId) {
+        // Clear messages in Firestore
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, {
+          chatHistory: []
+        });
+      }
+      // Clear messages in state
+      setMessages([{
+        role: 'assistant',
+        content: WELCOME_BACK_MESSAGE,
+        timestamp: new Date().toISOString()
+      }]);
+    } catch (error) {
+      console.error('Error clearing messages:', error);
+      setError('Failed to clear messages');
+    }
+  };
+
+  if (showInitialForm) {
+    return (
+      <div className="w-[85%] mx-auto px-4 py-8">
+        <ProfileForm 
+          onSubmit={handleProfileSubmit}
+          onCancel={userId ? null : () => setShowInitialForm(false)}
+          initialData={userProfile}
+          unitPreference={unitPreference}
+          onUnitPreferenceChange={setUnitPreference}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-[85%] mx-auto px-4 py-4 font-[Nunito]">
@@ -391,17 +504,24 @@ function HealthAssistant() {
         </div>
       )}
       
-      {/* User Profile Display */}
       {userProfile && (
         <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold mb-2">Your Profile</h2>
-            <button
-              onClick={() => setIsUpdatingProfile(true)}
-              className="text-sm text-blue-500 hover:text-blue-700"
-            >
-              Update Profile
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setUnitPreference(prev => prev === 'metric' ? 'imperial' : 'metric')}
+                className="text-sm px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                {unitPreference === 'metric' ? 'Switch to Imperial' : 'Switch to Metric'}
+              </button>
+              <button
+                onClick={() => setShowInitialForm(true)}
+                className="text-sm text-blue-500 hover:text-blue-700"
+              >
+                Update Profile
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
@@ -411,10 +531,12 @@ function HealthAssistant() {
               <span className="font-medium">Sex:</span> {userProfile.sex}
             </div>
             <div>
-              <span className="font-medium">Height:</span> {userProfile.height}cm
+              <span className="font-medium">Height: </span> 
+              {convertToDisplayUnits(userProfile.height, 'height', unitPreference === 'imperial')}
             </div>
             <div>
-              <span className="font-medium">Weight:</span> {userProfile.weight}kg
+              <span className="font-medium">Weight: </span> 
+              {convertToDisplayUnits(userProfile.weight, 'weight', unitPreference === 'imperial')}
             </div>
             <div>
               <span className="font-medium">Activity Level:</span> {userProfile.activity}
@@ -429,49 +551,81 @@ function HealthAssistant() {
       
       <div className="w-full mx-auto bg-gray-100 rounded-lg shadow-lg">
         <div className="p-8">
-          {/* Chat container */}
-          <div 
-            ref={chatContainerRef}
-            className="bg-white rounded-lg p-6 h-[600px] overflow-y-auto mb-6 shadow-inner"
-          >
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-              >
-                <div className="flex items-start max-w-[80%]">
-                  {message.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded-full bg-gray-200 mr-2 flex-shrink-0" />
-                  )}
-                  <div
-                    className={`rounded-lg p-3 ${
-                      message.role === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-200'
-                    }`}
+          <div className="bg-white rounded-lg p-6 shadow-inner">
+            {/* Clear messages button */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-700">Chat History</h3>
+              {messages.length > 1 && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to clear all messages?')) {
+                      clearMessages();
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-1 text-red-500 hover:bg-red-50 rounded-md transition-colors duration-200"
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    className="h-4 w-4" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
                   >
-                    {renderMessage(message.content)}
-                  </div>
-                  {message.role === 'user' && (
-                    <div className="w-8 h-8 rounded-full bg-gray-200 ml-2 flex-shrink-0" />
-                  )}
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start mb-4">
-                <div className="flex items-center bg-gray-200 rounded-lg p-3">
-                  <svg className="animate-spin h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                    />
                   </svg>
+                  Clear Chat
+                </button>
+              )}
+            </div>
+
+            {/* Messages container */}
+            <div 
+              ref={chatContainerRef}
+              className="h-[600px] overflow-y-auto"
+            >
+              {messages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+                >
+                  <div className="flex items-start max-w-[80%]">
+                    {message.role === 'assistant' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 mr-2 flex-shrink-0" />
+                    )}
+                    <div
+                      className={`rounded-lg p-3 ${
+                        message.role === 'user'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200'
+                      }`}
+                    >
+                      {renderMessage(message.content)}
+                    </div>
+                    {message.role === 'user' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 ml-2 flex-shrink-0" />
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
+              {isLoading && (
+                <div className="flex justify-start mb-4">
+                  <div className="flex items-center bg-gray-200 rounded-lg p-3">
+                    <svg className="animate-spin h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-         {/* Input area */}
-         <div className="flex gap-3">
+          <div className="flex gap-3 mt-6">
             <input
               type="text"
               value={inputMessage}
@@ -501,7 +655,6 @@ function HealthAssistant() {
         </div>
       </div>
 
-      {/* Notification for profile updates */}
       {isUpdatingProfile && (
         <div className="fixed bottom-4 right-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded shadow-lg">
           <div className="flex">
